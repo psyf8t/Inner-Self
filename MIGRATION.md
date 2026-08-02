@@ -68,6 +68,13 @@ Nothing is asked of you. On the first turn after the library is replaced:
 The harness runs this migration against a save produced by genuinely running upstream Inner Self
 for 40 turns, then asserts the settings, the brains and the label counter all survive.
 
+### If you are coming from a build that had K and L switches
+
+Earlier builds of Chronicle put budget autoscaling and the compliance monitor behind config card rows
+that defaulted off. Those rows are gone. If your config card still carries them, they are ignored and
+dropped the next time the card is rewritten, and both modules run regardless of what the old row said.
+Nothing is asked of you, and the harness covers this case.
+
 ### The one thing that can be dropped
 
 If a brain card's notes contain a key named `__proto__`, `constructor` or `prototype`, or a key
@@ -83,8 +90,14 @@ If you have hand-authored a key like that on purpose, rename it before upgrading
 
 ## Turning modules on, mid-adventure
 
-Every module is safe to enable in the middle of a running adventure, and safe to disable again.
-They are independent; enable them one at a time if you want to feel what each one does.
+Modules A, K and L have no switch and are already running: the transaction ledger, budget
+autoscaling, and the compliance monitor. Everything below is safe to enable in the middle of a running
+adventure, and safe to disable again. They are independent; enable them one at a time if you want to
+feel what each one does.
+
+Two consequences of K running unconditionally, worth knowing before you wonder where a feature went:
+an injection budget you set can be capped by your live context size, and an audit interval below the
+profile's floor is raised to that floor. `/diag` names the profile in force.
 
 | Module | What appears when you switch it on | What it costs you |
 |:--|:--|:--|
@@ -97,8 +110,6 @@ They are independent; enable them one at a time if you want to feel what each on
 | **H** Console | `/help` and eleven other commands start working | Any story action that begins with `/` and happens to match a command name is treated as a command. Unknown ones still fall through |
 | **I** Bonds | Each character gets a standing, stored on their own card under `#bond` | The model is told it may record advances, which spends part of the prompt |
 | **J** Diagnostics | A "Chronicle Diagnostics" card appears; the state budget and hook time rails start enforcing | Optional work is skipped when a hook runs long, which is the point |
-| **K** Budget autoscaling | Injection budgets start scaling to `info.maxChars`, read fresh every turn | On a small tier the world block shrinks and the audit stops. That is the module working, and `/diag` says so |
-| **L** Compliance monitor | Chronicle starts measuring whether the model answers its tasks | On a model that cannot, thought formation stops for 25 turns at a time. Existing memories are still injected |
 | **M** Injection canary | Every twelfth turn asks the model to begin with `(ok)` | One turn in twelve is spent proving the channel works. Once confirmed, it drops to one in ninety-six |
 | **N** Lean emission | Prompts and blocks drop to a terse register under XS/S or poor compliance | Less instruction for the model to follow, which is the intent; the grammar it must produce is unchanged |
 
@@ -110,11 +121,11 @@ too, ignored, and Module J will trim it if the state budget ever comes under pre
 
 ## If you play DeepSeek, Gemma or GLM
 
-Turn on **K, L, M and N** before anything else, whatever else you enable. They cost almost nothing and they are what makes the rest survive:
+Modules **K** and **L** already run for you, with no switch. Turn on **M and N** before anything else, whatever else you enable. Between the four of them:
 
 - Context on those models ranges from 4K to 128K depending on tier, the Optimized Context toggle, and credits. **K** scales every injection to what you actually have this turn, rather than to a number chosen when the mod was written.
-- On GLM the credit extension is charged per action, so the size changes turn to turn. K re-reads it every turn and never caches it.
-- Dynamic DeepSeek rotates between DeepSeek 3.0, 3.1 and 3.2 on every action, and they follow instructions differently. **L** discovers each rotation's capability instead of assuming it, and stops asking a model that cannot answer.
+- On GLM the credit extension is charged per action, so the size changes turn to turn. K re-reads it every turn and never caches it. This is why it has no switch: a fixed budget cannot meet a moving context.
+- Dynamic DeepSeek rotates between DeepSeek 3.0, 3.1 and 3.2 on every action, and they follow instructions differently. **L** discovers each rotation's capability instead of assuming it, and stops asking a model that cannot answer. It has no switch either, because a silently degrading model is exactly the failure nobody notices.
 - Optimized Context on Gemma and GLM can make the context hook read-only, silently discarding every injection. **M** detects that and moves the world to the memory channel, then tells you what the toggle is costing you.
 - **N** keeps the prompt short enough that a 4K turn still has room for the story.
 

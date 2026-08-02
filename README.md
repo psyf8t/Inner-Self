@@ -79,7 +79,7 @@ Enable Module M and Chronicle will check the channel for you — it asks the mod
 
 ### What you get at each context size
 
-With **Module K** on, `info.maxChars` is read every single turn and mapped to a profile. These are the values in `BUDGET_TABLE` at the top of the module, which is the only place they exist:
+`info.maxChars` is read every single turn by Module K, which has no switch, and mapped to a profile. These are the values in `BUDGET_TABLE` at the top of the module, which is the only place they exist:
 
 | Profile | `maxChars` | World block | Full brains | Digests | Witness lines | Clock lines | Audit | Chronicle's share |
 |:--|:--|:--|:--|:--|:--|:--|:--|:--|
@@ -94,9 +94,7 @@ A profile only ever takes away — your own settings stay the ceiling. If a turn
 Two things worth knowing:
 
 - **GLM can land at XS even on a high tier.** Its range starts at 4K, and the Optimized Context toggle halves it again. Do not assume your subscription tier decides your profile.
-- **GLM's credit extension is charged per action**, so the number moves turn to turn inside one adventure. Chronicle re-reads it every turn and never caches it, needs two consecutive turns at a new size before switching so a flicker cannot thrash your feature set, and shows the current profile and the last change in `/diag`.
-
-Without Module K, budgets are simply whatever you set on the config card, whatever context you have.
+- **GLM's credit extension is charged per action**, so the number moves turn to turn inside one adventure. This is exactly why the module has no switch. Chronicle re-reads the number every turn and never caches it, needs two consecutive turns at a new size before switching so a flicker cannot thrash your feature set, and shows the current profile and the last change in `/diag`.
 
 ---
 
@@ -182,11 +180,11 @@ Your existing adventures carry over with no data loss: the config card is found 
 
 Modules interact, and the ones that ask more of the model are the ones that break first. A gentle ramp:
 
-1. **Turns 1–50: nothing but the basics.** The ledger (Module A) is already on and needs no setup. Turn on **B** for pinned memories, and **L**, then watch `/diag` every so often. If the compliance band holds at *healthy*, your model can follow the format.
+1. **Turns 1–50: nothing but the basics.** The ledger (A), budget autoscaling (K) and the compliance monitor (L) are already running and need no setup. Turn on **B** for pinned memories, then check `/diag` every so often. If the compliance band holds at *healthy*, your model can follow the format.
 2. **Once the band holds: add C and J.** The world card gives you a date and a place; diagnostics start watching state size and hook timings for you.
 3. **Around turn 100: add E and F.** By then there is enough history for witnessed events and stale beliefs to mean something, and enough plot for a clock to be worth authoring.
 4. **Add D last, and only at Mythic context or above.** Concurrent brains are where format compliance breaks first: more characters in the prompt means more for the model to get wrong, and a small context makes it worse.
-5. **On DeepSeek, Gemma or GLM, turn K, M and N on at any point.** They only ever protect you.
+5. **On DeepSeek, Gemma or GLM, turn M and N on at any point.** They only ever protect you, and K and L are already doing their half.
 
 ---
 
@@ -224,7 +222,7 @@ If your scenario needs one of those words as a story action, or you know the pla
 
 ## Module reference
 
-Everything except the ledger is off until you turn it on. Settings below are the labels as they appear on the "Configure Chronicle" card.
+Three modules have no switch and always run: **A** the transaction ledger, **K** budget autoscaling, and **L** the compliance monitor. A fixed injection budget cannot meet a context that changes per action, and nothing else notices when a model stops honouring the operation format, so both are infrastructure rather than features. Everything else is off until you turn it on. Settings below are the labels as they appear on the "Configure Chronicle" card.
 
 | | Module | What you notice in play | Default |
 |:--|:--|:--|:--|
@@ -238,8 +236,8 @@ Everything except the ledger is off until you turn it on. Settings below are the
 | **H** | Player console | Slash commands work | off |
 | **I** | Bonds | Relationships move one rung at a time | off |
 | **J** | Diagnostics | State and timings stay under control | off |
-| **K** | Budget autoscaling | The mod fits whatever context you have | off |
-| **L** | Compliance monitor | Chronicle stops nagging a model that cannot answer | off |
+| **K** | Budget autoscaling | The mod fits whatever context you have | **always on** |
+| **L** | Compliance monitor | Chronicle stops nagging a model that cannot answer | **always on** |
 | **M** | Injection canary | You find out if Optimized Context is eating your world | off |
 | **N** | Lean emission | Prompts get short when room is tight | off |
 
@@ -358,22 +356,23 @@ Watches the saved state size, warning at 60% of budget and trimming at 85% by dr
 
 ### K — Runtime budget autoscaling
 
-*Setting: **Scale injections to the context the model has***
+*Always on. No setting.*
 
 Reads `info.maxChars` every turn and maps it to a profile, then derives every injection budget from that. See [what you get at each context size](#what-you-get-at-each-context-size).
 
 **You notice:** the world block gets shorter and the audit stops when your context shrinks, instead of everything being truncated at random. `/diag` names the current profile and the last change.
-**Settings:** just the switch; the profile table is `BUDGET_TABLE` at the top of the module.
+**Settings:** none. The profile table is `BUDGET_TABLE` at the top of the module, and editing it is how you change what each size buys.
+**Small print:** because it always runs, a profile can cap a setting you chose. Asking for three concurrent brains at a 25,000 character context gets you one, and asking for an audit every 10 turns gets you one every 150 at that size. `/diag` shows which profile you are in.
 
 ### L — Compliance monitor
 
-*Setting: **Watch whether the model can follow the task format***
+*Always on. One setting.*
 
 Keeps a rolling window of the last 40 task turns, scoring each as answered, recovered from malformed output, or ignored, and puts the model in one of three bands: **healthy** at 0.8 and above, **degraded** between 0.4 and 0.8, **minimal** below 0.4.
 
 **You notice:** on a model that cannot hold the format, Chronicle stops asking rather than wasting every turn on it — and tells you once that it has. Degraded shortens the prompts and drops the extras competing for the model's attention. Minimal stops tasks entirely, keeps the world and existing memories injected read-only, and tries again later.
-**Settings:** *Turns to stop asking after the model cannot answer* (default 25).
-**Small print:** falling is immediate; climbing is one band per 20 compliant turns. This is what makes Dynamic DeepSeek workable — it rotates between three models on every action, so Chronicle measures capability instead of assuming it.
+**Settings:** *Turns to stop asking after the model cannot answer* (default 25). The monitor itself cannot be switched off.
+**Small print:** falling is immediate; climbing is one band per 20 compliant turns. Because it always runs, a model that stops answering will quietly cost you the optional extras before it costs you thoughts — that is the degradation working, and `/diag` names the band. This is what makes Dynamic DeepSeek workable — it rotates between three models on every action, so Chronicle measures capability instead of assuming it.
 
 ### M — Injection canary
 
@@ -392,7 +391,7 @@ Asks the model to begin one reply in twelve with `(ok)`. Three misses in a row a
 Under the XS and S profiles, or whenever the compliance band is not healthy, every prompt drops to a terse register: one imperative line plus the grammar example, brains as bare `key: value` lines, the world as one comma-joined line.
 
 **You notice:** more of a small context left for the actual story. Measured with every module on: 10.8% of an 8,000 character context at XS, 7.9% of a 20,000 character context at S.
-**Settings:** just the switch. Needs Module K to know which profile you are in.
+**Settings:** just the switch. Module K supplies the profile, and always runs.
 
 ---
 
@@ -413,6 +412,10 @@ setting and becomes decoration — the script silently keeps the scenario defaul
 So if you hand-author or transplant a config card, the label text on the left of each colon has to
 match the generator exactly. Adding a prefix like `[B]` in front of a row is enough to break it. The
 safest way to get a valid card is to let the script build one, then edit only the values.
+
+A reference copy of exactly what the generator emits lives at
+[`docs/configure-chronicle.card.json`](./docs/configure-chronicle.card.json), and the harness fails if
+the code and that copy ever drift apart, or if any emitted row stops being one the parser reads.
 
 ### Preparing Scenario NPCs
 To work on its own, provide Chronicle with the names of your scenario's most important NPCs. Chronicle will create a new brain card for each NPC you prepare, after their name appears in the story. (Kinda like story card triggers, if that makes sense!) Brains are created on-demand to avoid overwhelming players.
@@ -494,7 +497,7 @@ Every module defaults off, including in the creator control panel. If your scena
 - A **mystery or intrigue** scenario wants **F** (clocks) and **E** (knowledge), and probably **C** for the date.
 - A **relationship-led** scenario wants **I** (bonds) and **B** (pinned memories).
 - A **long survival or travel** scenario wants **C** most of all, for the calendar.
-- **Any** scenario aimed at DeepSeek, Gemma or GLM players wants **K, L, M, N** on. They cost almost nothing and they are what keeps the rest alive on a small context.
+- **Any** scenario aimed at DeepSeek, Gemma or GLM players wants **M and N** on. K and L already run unconditionally; these two are the rest of what keeps a small context alive.
 
 Leave **D** off unless you know your players have a large context.
 
@@ -579,8 +582,8 @@ Measured over three 300 turn runs with every module enabled, 2,700 hook calls: 0
 - **H** player console — twelve commands, colliding native names deliberately unregistered
 - **I** bonds — a seven rung ladder that cannot be skipped upward
 - **J** diagnostics — state budget, hook time rails, card index, diagnostics card
-- **K** budget autoscaling — every injection scaled to `info.maxChars`, read fresh each turn
-- **L** compliance monitor — measures whether the model can answer, and stops asking when it cannot
+- **K** budget autoscaling — every injection scaled to `info.maxChars`, read fresh each turn, no switch
+- **L** compliance monitor — measures whether the model can answer and stops asking when it cannot, no switch
 - **M** injection canary — detects a read-only context hook, falls back to the memory channel
 - **N** lean emission — terse prompts under small contexts or poor compliance
 - Reserved property names and oversized keys refused at every parse boundary
