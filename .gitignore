@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Local editor and tool settings
+.claude/settings.local.json
+
+# Scratch files
+*.log
+*.tmp
+scratch/
+tmp/
+
+# OS noise
+.DS_Store
+Thumbs.db

@@ -3,7 +3,7 @@
 /**
  * Main control panel for scenario creator convenience
  * Settings defined here will override their counterparts elsewhere
- * Most AC and Inner Self settings are included
+ * Most AC and Chronicle settings are included
  * Safe to delete
  */
 globalThis.MainSettings = (class MainSettings {
@@ -11,19 +11,22 @@ globalThis.MainSettings = (class MainSettings {
     //—————————————————————————————————————————————————————————————————————————————————
 
     /**
-     * Inner Self v1.0.2
-     * Made by LewdLeah on January 3, 2026
-     * Gives story characters the ability to learn, plan, and adapt over time
-     * Inner Self is free and open-source for anyone! ❤️
+     * Chronicle v1.0.0
+     * A persistent world simulation layer for long-form AI Dungeon adventures
+     * Built on Inner Self v1.0.2 by LewdLeah (MIT), which remains its thought engine
+     * Chronicle is free and open-source for anyone! ❤️
+     *
+     * Setting names are unchanged from Inner Self on purpose
+     * A scenario that still declares "static InnerSelf" here keeps working untouched
      */
-    static InnerSelf = {
+    static Chronicle = {
     // Default settings for scenario creators to modify:
 
-    // List the first name of every scenario NPC whose brain should be simulated by Inner Self:
+    // List the first name of every scenario NPC whose brain should be simulated by Chronicle:
     IMPORTANT_SCENARIO_CHARACTERS: ""
     // (write a comma separated list of names inside the "" like so: "Leah, Lily, Lydia")
     ,
-    // Is Inner Self already enabled when the adventure begins?
+    // Is Chronicle already enabled when the adventure begins?
     IS_INNER_SELF_ENABLED_BY_DEFAULT: true
     // (true or false)
     ,
@@ -39,7 +42,7 @@ globalThis.MainSettings = (class MainSettings {
     PERCENTAGE_OF_RECENT_STORY_USED_FOR_BRAINS: 30
     // (1 to 95)
     ,
-    // How many actions back should Inner Self look for character name triggers?
+    // How many actions back should Chronicle look for character name triggers?
     NUMBER_OF_ACTIONS_TO_LOOK_BACK_FOR_TRIGGERS: 5
     // (1 to 250)
     ,
@@ -59,16 +62,130 @@ globalThis.MainSettings = (class MainSettings {
     IS_JSON_FORMAT_USED_FOR_BRAIN_CARD_NOTES: false
     // (true or false)
     ,
-    // Should Inner Self model task outputs be displayed inline with the adventure text itself?
+    // Should Chronicle model task outputs be displayed inline with the adventure text itself?
     IS_DEBUG_MODE_ENABLED_BY_DEFAULT: false
     // (true or false)
     ,
-    // Is the "Configure Inner Self" story card pinned near the top of the in-game list?
+    // Is the "Configure Chronicle" story card pinned near the top of the in-game list?
     IS_CONFIG_CARD_PINNED_BY_DEFAULT: false
     // (true or false)
     ,
     // Is AC already enabled when the adventure begins?
     IS_AC_ENABLED_BY_DEFAULT: false
+    // (true or false)
+    ,
+
+    // Chronicle modules, every one of them off until you turn it on:
+
+    // Module B — do brains use pinned core, long-term, and working memory tiers?
+    IS_TIERED_MEMORY_ENABLED: false
+    // (true or false)
+    ,
+    // Module B — how many pinned core thoughts may a character keep?
+    MAX_CORE_THOUGHTS: 5
+    // (1 to 20)
+    ,
+    // Module B — how many characters of thought may one brain hold before it must forget?
+    MAX_BRAIN_CHARS: 4000
+    // (500 to 20000)
+    ,
+    // Module B — how many story events must a thought be linked to before it becomes long-term?
+    LONG_TERM_PROMOTION_HITS: 2
+    // (1 to 20)
+    ,
+    // Module C — is world state (date, place, arc, factions, debts, threats) tracked and injected?
+    IS_WORLD_CHRONICLE_ENABLED: false
+    // (true or false)
+    ,
+    // Module C — how many characters of world state may be injected each turn?
+    MAX_CHRONICLE_BLOCK_CHARS: 700
+    // (200 to 2000)
+    ,
+    // Module C — what in-game date does the adventure begin on?
+    STARTING_IN_GAME_DATE: "Day 1"
+    // (any text inside the "")
+    ,
+    // Module C — how many days may one turn advance the calendar without an explicit marker?
+    MAX_DAYS_ADVANCED_PER_TURN: 30
+    // (1 to 365)
+    ,
+    // Module D — may several characters present in a scene think at once?
+    IS_ENSEMBLE_ENABLED: false
+    // (true or false)
+    ,
+    // Module D — how many full brains may share one context?
+    MAX_CONCURRENT_BRAINS: 3
+    // (1 to 6)
+    ,
+    // Module E — do characters track who witnessed what, and act on what they still believe?
+    IS_KNOWLEDGE_MODEL_ENABLED: false
+    // (true or false)
+    ,
+    // Module E — how many characters of witnessed event log may be retained?
+    MAX_EVENT_LOG_CHARS: 3000
+    // (500 to 20000)
+    ,
+    // Module E — how likely is an unwitnessed household fact to reach someone each turn?
+    RUMOR_SPREAD_PERCENT_PER_TURN: 10
+    // (0 to 100)
+    ,
+    // Module F — are progress clocks and scheduled consequences tracked?
+    IS_CLOCKS_ENABLED: false
+    // (true or false)
+    ,
+    // Module G — does the continuity auditor periodically check the scene against the chronicle?
+    IS_CONTINUITY_AUDITOR_ENABLED: false
+    // (true or false)
+    ,
+    // Module G — how many turns pass between continuity audits?
+    AUDIT_INTERVAL: 75
+    // (10 to 1000)
+    ,
+    // Module H — are player commands (/help, /state, /undo, and the rest) available in game?
+    IS_PLAYER_CONSOLE_ENABLED: false
+    // (true or false)
+    ,
+    // Module I — do characters track a relationship bond with the player character?
+    IS_BONDS_ENABLED: false
+    // (true or false)
+    ,
+    // Module I — how many turns must pass between one bond advance and the next?
+    MIN_TURNS_PER_BOND_STAGE: 150
+    // (0 to 10000)
+    ,
+    // Module J — are diagnostics and safety rails active?
+    IS_DIAGNOSTICS_ENABLED: false
+    // (true or false)
+    ,
+    // Module J — how many milliseconds may a hook spend before optional work is skipped?
+    TIME_BUDGET_MS: 1200
+    // (100 to 2000)
+    ,
+    // Module J — how many characters may the adventure's saved state grow to?
+    MAX_STATE_CHARS: 40000
+    // (8000 to 200000)
+    ,
+
+    // Model compatibility. Turn these on first if you play DeepSeek, Gemma or GLM:
+
+    // Module K — should every injection budget scale to the context the model actually has?
+    IS_BUDGET_AUTOSCALING_ENABLED: false
+    // (true or false)
+    ,
+    // Module L — should Chronicle watch whether the model can follow its task format?
+    IS_COMPLIANCE_MONITOR_ENABLED: false
+    // (true or false)
+    ,
+    // Module L — how many turns does Chronicle stop asking after a model proves it cannot answer?
+    COMPLIANCE_COOLDOWN_TURNS: 25
+    // (5 to 200)
+    ,
+    // Module M — should Chronicle check whether its context injections are landing at all?
+    IS_INJECTION_CANARY_ENABLED: false
+    // (true or false)
+    ,
+    // Module N — should prompts drop to a terse register when context or compliance is tight?
+    IS_LEAN_EMISSION_ENABLED: false
     // (true or false)
     ,
     }; //——————————————————————————————————————————————————————————————————————————————
@@ -191,14 +308,14 @@ globalThis.MainSettings = (class MainSettings {
     }; //——————————————————————————————————————————————————————————————————————————————
 
     #config;
-    constructor(script, alternative) {
-        this.#config = (
-            MainSettings.hasOwnProperty(script)
-            ? MainSettings[script]
-            : ((typeof alternative === "string") && MainSettings.hasOwnProperty(alternative))
-            ? MainSettings[alternative]
+    constructor(script, ...alternatives) {
+        // Alternatives let a scenario keep the block name it was written with
+        // A creator whose control panel still says "static InnerSelf" needs no edits
+        this.#config = [script, ...alternatives].reduce((found, name) => (
+            (found !== null) ? found
+            : ((typeof name === "string") && MainSettings.hasOwnProperty(name)) ? MainSettings[name]
             : null
-        );
+        ), null);
         return this;
     }
     merge(settings) {
@@ -215,12 +332,19 @@ globalThis.MainSettings = (class MainSettings {
 //—————————————————————————————————————————————————————————————————————————————————————
 
 /**
- * Inner Self v1.0.2
- * Made by LewdLeah on January 3, 2026
- * Gives story characters the ability to learn, plan, and adapt over time
- * Inner Self is free and open-source for anyone! ❤️
+ * Chronicle v0.1.0
+ * A persistent world simulation layer for long-form AI Dungeon adventures
+ *
+ * Chronicle is a fork of Inner Self v1.0.2, made by LewdLeah on January 3, 2026
+ * Inner Self gave individual characters memory, and remains the thought engine here
+ * Chronicle makes every write transactional, so a retry never corrupts what came before
+ *
+ * Inner Self is MIT licensed and that notice is retained, in full, in the LICENSE file
+ * Copyright (c) 2026 LewdLeah
+ * Chronicle's own modifications are released under those same MIT terms
+ * Both are free and open-source for anyone! ❤️
  */
-function InnerSelf(hook) {
+function Chronicle(hook) {
     "use strict";
     /**
      * Scenario-level default settings
@@ -230,11 +354,11 @@ function InnerSelf(hook) {
     const S = {
     // Default settings for scenario creators to modify:
 
-    // List the first name of every scenario NPC whose brain should be simulated by Inner Self:
+    // List the first name of every scenario NPC whose brain should be simulated by Chronicle:
     IMPORTANT_SCENARIO_CHARACTERS: ""
     // (write a comma separated list of names inside the "" like so: "Leah, Lily, Lydia")
     ,
-    // Is Inner Self already enabled when the adventure begins?
+    // Is Chronicle already enabled when the adventure begins?
     IS_INNER_SELF_ENABLED_BY_DEFAULT: true
     // (true or false)
     ,
@@ -250,7 +374,7 @@ function InnerSelf(hook) {
     PERCENTAGE_OF_RECENT_STORY_USED_FOR_BRAINS: 30
     // (1 to 95)
     ,
-    // How many actions back should Inner Self look for character name triggers?
+    // How many actions back should Chronicle look for character name triggers?
     NUMBER_OF_ACTIONS_TO_LOOK_BACK_FOR_TRIGGERS: 5
     // (1 to 250)
     ,
@@ -270,11 +394,11 @@ function InnerSelf(hook) {
     IS_JSON_FORMAT_USED_FOR_BRAIN_CARD_NOTES: false
     // (true or false)
     ,
-    // Should Inner Self model task outputs be displayed inline with the adventure text itself?
+    // Should Chronicle model task outputs be displayed inline with the adventure text itself?
     IS_DEBUG_MODE_ENABLED_BY_DEFAULT: false
     // (true or false)
     ,
-    // Is the "Configure Inner Self" story card pinned near the top of the in-game list?
+    // Is the "Configure Chronicle" story card pinned near the top of the in-game list?
     IS_CONFIG_CARD_PINNED_BY_DEFAULT: false
     // (true or false)
     ,
@@ -282,11 +406,129 @@ function InnerSelf(hook) {
     IS_AC_ENABLED_BY_DEFAULT: false
     // (true or false)
     ,
+
+    // Chronicle modules, every one of them off until you turn it on:
+
+    // Module B — do brains use pinned core, long-term, and working memory tiers?
+    IS_TIERED_MEMORY_ENABLED: false
+    // (true or false)
+    ,
+    // Module B — how many pinned core thoughts may a character keep?
+    MAX_CORE_THOUGHTS: 5
+    // (1 to 20)
+    ,
+    // Module B — how many characters of thought may one brain hold before it must forget?
+    MAX_BRAIN_CHARS: 4000
+    // (500 to 20000)
+    ,
+    // Module B — how many story events must a thought be linked to before it becomes long-term?
+    LONG_TERM_PROMOTION_HITS: 2
+    // (1 to 20)
+    ,
+    // Module C — is world state (date, place, arc, factions, debts, threats) tracked and injected?
+    IS_WORLD_CHRONICLE_ENABLED: false
+    // (true or false)
+    ,
+    // Module C — how many characters of world state may be injected each turn?
+    MAX_CHRONICLE_BLOCK_CHARS: 700
+    // (200 to 2000)
+    ,
+    // Module C — what in-game date does the adventure begin on?
+    STARTING_IN_GAME_DATE: "Day 1"
+    // (any text inside the "")
+    ,
+    // Module C — how many days may one turn advance the calendar without an explicit marker?
+    MAX_DAYS_ADVANCED_PER_TURN: 30
+    // (1 to 365)
+    ,
+    // Module D — may several characters present in a scene think at once?
+    IS_ENSEMBLE_ENABLED: false
+    // (true or false)
+    ,
+    // Module D — how many full brains may share one context?
+    MAX_CONCURRENT_BRAINS: 3
+    // (1 to 6)
+    ,
+    // Module E — do characters track who witnessed what, and act on what they still believe?
+    IS_KNOWLEDGE_MODEL_ENABLED: false
+    // (true or false)
+    ,
+    // Module E — how many characters of witnessed event log may be retained?
+    MAX_EVENT_LOG_CHARS: 3000
+    // (500 to 20000)
+    ,
+    // Module E — how likely is an unwitnessed household fact to reach someone each turn?
+    RUMOR_SPREAD_PERCENT_PER_TURN: 10
+    // (0 to 100)
+    ,
+    // Module F — are progress clocks and scheduled consequences tracked?
+    IS_CLOCKS_ENABLED: false
+    // (true or false)
+    ,
+    // Module G — does the continuity auditor periodically check the scene against the chronicle?
+    IS_CONTINUITY_AUDITOR_ENABLED: false
+    // (true or false)
+    ,
+    // Module G — how many turns pass between continuity audits?
+    AUDIT_INTERVAL: 75
+    // (10 to 1000)
+    ,
+    // Module H — are player commands (/help, /state, /undo, and the rest) available in game?
+    IS_PLAYER_CONSOLE_ENABLED: false
+    // (true or false)
+    ,
+    // Module I — do characters track a relationship bond with the player character?
+    IS_BONDS_ENABLED: false
+    // (true or false)
+    ,
+    // Module I — how many turns must pass between one bond advance and the next?
+    MIN_TURNS_PER_BOND_STAGE: 150
+    // (0 to 10000)
+    ,
+    // Module J — are diagnostics and safety rails active?
+    IS_DIAGNOSTICS_ENABLED: false
+    // (true or false)
+    ,
+    // Module J — how many milliseconds may a hook spend before optional work is skipped?
+    TIME_BUDGET_MS: 1200
+    // (100 to 2000)
+    ,
+    // Module J — how many characters may the adventure's saved state grow to?
+    MAX_STATE_CHARS: 40000
+    // (8000 to 200000)
+    ,
+
+    // Model compatibility. Turn these on first if you play DeepSeek, Gemma or GLM:
+
+    // Module K — should every injection budget scale to the context the model actually has?
+    IS_BUDGET_AUTOSCALING_ENABLED: false
+    // (true or false)
+    ,
+    // Module L — should Chronicle watch whether the model can follow its task format?
+    IS_COMPLIANCE_MONITOR_ENABLED: false
+    // (true or false)
+    ,
+    // Module L — how many turns does Chronicle stop asking after a model proves it cannot answer?
+    COMPLIANCE_COOLDOWN_TURNS: 25
+    // (5 to 200)
+    ,
+    // Module M — should Chronicle check whether its context injections are landing at all?
+    IS_INJECTION_CANARY_ENABLED: false
+    // (true or false)
+    ,
+    // Module N — should prompts drop to a terse register when context or compliance is tight?
+    IS_LEAN_EMISSION_ENABLED: false
+    // (true or false)
+    ,
     }; //——————————————————————————————————————————————————————————————————————————————
 
-    const version = "v1.0.2";
+    // When this hook began, for the time budget in Module J
+    const started = Date.now();
+    const version = "v1.0.0";
+    // The upstream release Chronicle forked, shown to players alongside the credit
+    const ancestry = "Inner Self v1.0.2";
     // Validate that all required AI Dungeon global properties exist
-    // Without these, Inner Self literally cannot function
+    // Without these, Chronicle literally cannot function
     if (
         !globalThis.state || (typeof state !== "object") || Array.isArray(state)
         || !globalThis.info || (typeof info !== "object") || Array.isArray(info)
@@ -326,8 +568,14 @@ function InnerSelf(hook) {
         return target;
     };
     /**
-     * Persistent state of Inner Self stored in the adventure's state object
+     * Persistent state inherited from Inner Self, stored in the adventure's state object
      * This survives across turns
+     *
+     * The key stays "InnerSelf" after the rename for two hard reasons:
+     * 1. Auto-Cards writes state.InnerSelf.AC.forced and state.InnerSelf.AC.event by that
+     *    literal path, and the Auto-Cards section of this file must stay byte-identical
+     * 2. An adventure rolled back to upstream Inner Self keeps its label counter intact
+     * Everything Chronicle adds lives under state.CHRONICLE instead
      * @type {Object}
      */
     const IS = state.InnerSelf = deepMerge(state.InnerSelf || {}, {
@@ -348,9 +596,91 @@ function InnerSelf(hook) {
             // External use of the AC API force-installs so it just works
             forced: false,
             // NGL this one didn't need to be stateful but I didn't feel like declaring a local so whatevs
-            // Basically AC sets this to true when it does stuff, so Inner Self can inhibit itself
+            // Basically AC sets this to true when it does stuff, so Chronicle can inhibit itself
             event: false
         }
+    });
+    /**
+     * Persistent state added by Chronicle
+     * Everything here must stay JSON-serializable and byte-capped
+     * @typedef {Object} transaction
+     * @property {number} actionCount - info.actionCount when the transaction was staged
+     * @property {string} fingerprint - Fingerprint of the generation that produced it
+     * @property {number} labelStart - IS.label before this transaction allocated any labels
+     * @property {string} encoding - Zero-width label markers embedded in that generation
+     * @property {string} agent - Name of the agent whose brain the operations belong to
+     * @property {number} percent - config.percent captured at staging time
+     * @property {boolean} json - config.json captured at staging time
+     * @property {Object[]} ops - Plain serializable operation descriptors
+     * @type {Object}
+     */
+    const CH = state.CHRONICLE = deepMerge(state.CHRONICLE || {}, {
+        // Schema version of state.CHRONICLE, for future migrations
+        schema: 1,
+        // The single staged, uncommitted transaction (null when there is nothing pending)
+        /** @type {transaction|null} */
+        pending: null,
+        // Every staging made for the current turn, newest last
+        candidates: [],
+        // Snapshot of what the last committed transaction overwrote, powering /undo
+        undo: null,
+        // Bounded record of recent transaction outcomes, for diagnostics
+        journal: [],
+        // Lifetime counters
+        stats: {
+            // Transactions committed
+            commits: 0,
+            // Transactions discarded because their generation never made it into the story
+            discards: 0,
+            // Operations refused at commit time (missing key, unsafe key, malformed descriptor)
+            refused: 0
+        },
+        // Module B: per agent thought metadata, { seen, hits, turn, compress }
+        mem: {},
+        // Module C: the world as Chronicle understands it
+        world: {
+            date: "",
+            day: 1,
+            place: "",
+            arc: "",
+            factions: {},
+            debts: [],
+            threats: [],
+            lost: []
+        },
+        // Module F: clock progress, keyed by clock name; definitions live on a card
+        clocks: {},
+        // Module F: scheduled consequences waiting for their turn
+        queue: [],
+        // Module F: consequences injected this turn, confirmed at commit
+        fire: null,
+        // Module E: byte-capped log of what happened and who saw it
+        events: [],
+        // Module E: current facts, and who knows them
+        facts: {},
+        // Module E: what each character still believes, after the truth moved on
+        stale: {},
+        // Module I: relationship stage per character
+        bonds: {},
+        // Module G: when the last audit ran, and what it found
+        audit: { last: 0, findings: [] },
+        // Module H: set by a slash command, read by the context hook
+        console: { stop: false },
+        // Who is writing this turn, so a batch of retry candidates all reach the same brain
+        writer: null,
+        // Module J: hook timings, skips, and the state size warning latch
+        diag: { hooks: { input: [], context: [], output: [] }, skips: 0, warned: false },
+        // Module J: cached story card positions, validated on use
+        index: {},
+        // Module K: the context profile in force, and how it got there
+        budget: { profile: "", candidate: "", streak: 0, maxChars: 0, changes: [] },
+        // Module L: how well the model has been answering
+        compliance: {
+            window: [], band: "healthy", lowest: "healthy", streak: 0,
+            cooldownUntil: 0, since: 0, told: false
+        },
+        // Module M: whether context injections are landing at all
+        canary: { state: "unknown", misses: 0, hits: 0, lastTurn: -1, told: false, armed: 0 }
     });
     /**
      * Checks if Auto-Cards is available in the global scope
@@ -410,12 +740,12 @@ function InnerSelf(hook) {
         return {};
     };
     /**
-     * Validated config settings for Inner Self
+     * Validated config settings for Chronicle
      * Default settings are specified by creators at the scenario level
      * Runtime settings are specified by players at the adventure level
      * @typedef {Object} config
      * @property {Object|null} card - Config card object reference
-     * @property {boolean} allow - Is Inner Self enabled?
+     * @property {boolean} allow - Is Chronicle enabled?
      * @property {string} player - The player character's name
      * @property {number} pov - Is the adventure in 1st, 2nd, or 3rd person?
      * @property {boolean} guide - Show a detailed guide
@@ -431,13 +761,13 @@ function InnerSelf(hook) {
      * @property {string[]} agents - All agent names, ordered from highest to lowest trigger priority
      */
     /**
-     * Config class - Manages the Inner Self configuration card
+     * Config class - Manages the Chronicle configuration card
      * Handles building, finding, parsing, and validating all settings
      * @class
      */
     class Config {
         /**
-         * Build or find the Inner Self config card
+         * Build or find the Chronicle config card
          * Returns the card reference and all parsed settings
          * This is the heart of the config system
          * @param {Set<string>} [pending] - Recursion aid for tracking pending agents
@@ -446,7 +776,7 @@ function InnerSelf(hook) {
         static get(pending = new Set()) {
         // Allow MainSettings mod to override local defaults
         if (typeof globalThis.MainSettings === "function") {
-            new MainSettings("InnerSelf", "IS").merge(S);
+            new MainSettings("Chronicle", "InnerSelf", "IS").merge(S);
         }
         /**
          * Fallback values when settings are missing or invalid
@@ -467,7 +797,44 @@ function InnerSelf(hook) {
             debug: false,
             pin: false,
             auto: false,
-            agents: []
+            agents: [],
+            // Module B
+            tiers: false,
+            core: 5,
+            brainChars: 4000,
+            promote: 2,
+            // Module C
+            world: false,
+            worldChars: 700,
+            startDate: "Day 1",
+            maxDays: 30,
+            // Module D
+            ensemble: false,
+            brains: 3,
+            // Module E
+            knows: false,
+            eventChars: 3000,
+            rumor: 10,
+            // Module F
+            clocks: false,
+            // Module G
+            audit: false,
+            auditEvery: 75,
+            // Module H
+            console: false,
+            // Module I
+            bonds: false,
+            bondTurns: 150,
+            // Module J
+            diag: false,
+            timeBudget: 1200,
+            stateChars: 40000,
+            // Modules K to N
+            autoscale: false,
+            compliance: false,
+            cooldown: 25,
+            canary: false,
+            lean: false
         });
         /** @type {config} */
         const config = { card: null };
@@ -539,19 +906,19 @@ function InnerSelf(hook) {
             }
         });
         /**
-         * Template for building the Inner Self config card
+         * Template for building the Chronicle config card
          * Contains all the user-facing text and settings
          * @type {Object}
          */
         const template = {
             type: "class",
-            title: "Configure \nInner Self",
+            title: "Configure \nChronicle",
             // The config card entry contains the main settings
             entry: [
                 {
-                    message: "Inner Self grants story characters the ability to learn, plan, and adapt over time. Edit the entry and notes below to control how Inner Self behaves."
+                    message: "Chronicle grants story characters the ability to learn, plan, and adapt over time, and records every change transactionally so a retry never rewrites the past. Edit the entry and notes below to control how Chronicle behaves."
                 },
-                { message: "Enable Inner Self:", ...factory(
+                { message: "Enable Chronicle:", alias: "Enable Inner Self:", ...factory(
                     "allow", S.IS_INNER_SELF_ENABLED_BY_DEFAULT
                 ) },
                 {
@@ -629,16 +996,111 @@ function InnerSelf(hook) {
                     "auto", S.IS_AC_ENABLED_BY_DEFAULT
                 ) },
                 {
-                    message: "Write the name(s) of your non-player characters at the very bottom of the \"notes\" section below. This is mandatory because it allows Inner Self to assemble independent minds for the correct individuals."
+                    message: "Chronicle modules follow. Each one is off until you turn it on, and each is safe to turn off again at any time."
+                },
+                { message: "Tiered memory with pinned core thoughts:", ...factory(
+                    "tiers", S.IS_TIERED_MEMORY_ENABLED
+                ) },
+                { message: "Maximum pinned core thoughts per character:", ...factory(
+                    "core", S.MAX_CORE_THOUGHTS, { lower: 1, upper: 20 }
+                ) },
+                { message: "Maximum characters of thought per brain:", ...factory(
+                    "brainChars", S.MAX_BRAIN_CHARS, { lower: 500, upper: 20000 }
+                ) },
+                { message: "Story links before a thought becomes long-term:", ...factory(
+                    "promote", S.LONG_TERM_PROMOTION_HITS, { lower: 1, upper: 20 }
+                ) },
+                { message: "Track world state (date, place, arc, factions):", ...factory(
+                    "world", S.IS_WORLD_CHRONICLE_ENABLED
+                ) },
+                { message: "Maximum characters of world state per turn:", ...factory(
+                    "worldChars", S.MAX_CHRONICLE_BLOCK_CHARS, { lower: 200, upper: 2000 }
+                ) },
+                {
+                    message: "In-game date the adventure began on:",
+                    builder: (cfg = {}) => ` "${config.startDate ?? cfg.setter?.(S.STARTING_IN_GAME_DATE)}"`,
+                    setter: (value = null, fallible = false) => (
+                        (typeof value === "string")
+                        ? (config.startDate = value.replaceAll("\"", "").trim().slice(0, 60) || fallback.startDate)
+                        : (fallible)
+                        ? null
+                        : (config.startDate = fallback.startDate)
+                    )
+                },
+                { message: "Maximum days one turn may advance:", ...factory(
+                    "maxDays", S.MAX_DAYS_ADVANCED_PER_TURN, { lower: 1, upper: 365 }
+                ) },
+                { message: "Let several present characters think at once:", ...factory(
+                    "ensemble", S.IS_ENSEMBLE_ENABLED
+                ) },
+                { message: "Maximum full brains sharing one context:", ...factory(
+                    "brains", S.MAX_CONCURRENT_BRAINS, { lower: 1, upper: 6 }
+                ) },
+                { message: "Track who witnessed what, and what they still believe:", ...factory(
+                    "knows", S.IS_KNOWLEDGE_MODEL_ENABLED
+                ) },
+                { message: "Maximum characters of witnessed event log:", ...factory(
+                    "eventChars", S.MAX_EVENT_LOG_CHARS, { lower: 500, upper: 20000 }
+                ) },
+                { message: "Chance per turn that a secret spreads to someone:", ...factory(
+                    "rumor", S.RUMOR_SPREAD_PERCENT_PER_TURN, { lower: 0, upper: 100, suffix: "%" }
+                ) },
+                { message: "Track progress clocks and scheduled consequences:", ...factory(
+                    "clocks", S.IS_CLOCKS_ENABLED
+                ) },
+                { message: "Run periodic continuity audits:", ...factory(
+                    "audit", S.IS_CONTINUITY_AUDITOR_ENABLED
+                ) },
+                { message: "Turns between continuity audits:", ...factory(
+                    "auditEvery", S.AUDIT_INTERVAL, { lower: 10, upper: 1000 }
+                ) },
+                { message: "Enable player commands like /help and /undo:", ...factory(
+                    "console", S.IS_PLAYER_CONSOLE_ENABLED
+                ) },
+                { message: "Track relationship bonds with the player:", ...factory(
+                    "bonds", S.IS_BONDS_ENABLED
+                ) },
+                { message: "Minimum turns between bond advances:", ...factory(
+                    "bondTurns", S.MIN_TURNS_PER_BOND_STAGE, { lower: 0, upper: 10000 }
+                ) },
+                { message: "Enable diagnostics and safety rails:", ...factory(
+                    "diag", S.IS_DIAGNOSTICS_ENABLED
+                ) },
+                { message: "Milliseconds a hook may spend before skipping extras:", ...factory(
+                    "timeBudget", S.TIME_BUDGET_MS, { lower: 100, upper: 2000 }
+                ) },
+                { message: "Maximum characters of saved adventure state:", ...factory(
+                    "stateChars", S.MAX_STATE_CHARS, { lower: 8000, upper: 200000 }
+                ) },
+                {
+                    message: "Model compatibility. Turn these on first if you play DeepSeek, Gemma or GLM, whose context can be thirty times smaller on one subscription tier than another."
+                },
+                { message: "Scale injections to the context the model has:", ...factory(
+                    "autoscale", S.IS_BUDGET_AUTOSCALING_ENABLED
+                ) },
+                { message: "Watch whether the model can follow the task format:", ...factory(
+                    "compliance", S.IS_COMPLIANCE_MONITOR_ENABLED
+                ) },
+                { message: "Turns to stop asking after the model cannot answer:", ...factory(
+                    "cooldown", S.COMPLIANCE_COOLDOWN_TURNS, { lower: 5, upper: 200 }
+                ) },
+                { message: "Check that context injections are landing at all:", ...factory(
+                    "canary", S.IS_INJECTION_CANARY_ENABLED
+                ) },
+                { message: "Use terse prompts when context or compliance is tight:", ...factory(
+                    "lean", S.IS_LEAN_EMISSION_ENABLED
+                ) },
+                {
+                    message: "Write the name(s) of your non-player characters at the very bottom of the \"notes\" section below. This is mandatory because it allows Chronicle to assemble independent minds for the correct individuals."
                 }
             ],
             // Description section contains info and agent list
             description: [
                 {
-                    message: "Please visit my profile @LewdLeah through the link above and read my bio for simple steps to add Inner Self to your own scenarios! ❤️"
+                    message: "Chronicle is built on Inner Self by LewdLeah. Please visit the profile linked above and read the bio for simple steps to add it to your own scenarios! ❤️"
                 },
                 {
-                    message: `Inner Self ${version} is an open-source and general-purpose AI Dungeon mod by LewdLeah. You have my full permission to use it with any scenario!`
+                    message: `Chronicle ${version} is an open-source AI Dungeon mod, forked from ${ancestry} by LewdLeah under the MIT licence. You have full permission to use it with any scenario!`
                 },
                 {
                     // This is where players list their NPCs
@@ -668,8 +1130,49 @@ function InnerSelf(hook) {
         };
         // Track discovered agents to avoid duplicates
         const agents = new Set();
-        // Simplified title for fuzzy matching
-        const target = simplify(template.title);
+        /**
+         * Bargain bin levenshtein distance, but less costly
+         * Returns true when the two simplified titles are too far apart to be the same card
+         * @param {string} current - Simplified title actually found on the card
+         * @param {string} target - Simplified title we are looking for
+         * @returns {boolean} true if this is NOT the card we want
+         */
+        const mismatched = (current = "", target = "") => {
+            const maxMistakes = 2;
+            let mistakes = 0;
+            // Target index (expected title)
+            let t = 0;
+            // Current index (actual title)
+            let c = 0;
+            while ((t < target.length) && (c < current.length)) {
+                if (current[c] === target[t]) {
+                    // Chars match, advance both
+                    t++; c++;
+                    continue;
+                } else if (maxMistakes <= mistakes) {
+                    // Too many mistakes, this isn't the config card (I hope)
+                    return true;
+                }
+                // Allow for insertions, deletions, or substitutions
+                mistakes++;
+                (current[c + 1] === target[t])
+                ? c++
+                : (current[c] === target[t + 1])
+                ? t++
+                : (t++, c++)
+            }
+            // Count leftover chars as mistakes
+            mistakes += (target.length - t) + (current.length - c);
+            return (maxMistakes < mistakes);
+        };
+        /**
+         * Simplified titles that identify the config card
+         * The Inner Self title is far outside fuzzy range of the Chronicle one, so an
+         * adventure that predates the rename would otherwise grow a second config card
+         * and silently lose every setting the player had chosen
+         * @type {string[]}
+         */
+        const targets = [simplify(template.title), simplify("Configure \nInner Self")];
         // Scan all story cards in reverse order
         // Looking for config cards, agent cards, and duplicates (remove the latter in-place)
         for (let i = storyCards.length - 1; -1 < i; i--) {
@@ -708,39 +1211,10 @@ function InnerSelf(hook) {
                     card.title = agent;
                     pending.add(agent);
                 }
-            } else if ((() => {
-                // Fuzzy matching to find the config card even if title is slightly mangled
+            } else if (targets.every(target => mismatched(simplify(card.title), target))) {
+                // Fuzzy matching finds the config card even if the title is slightly mangled
                 // Because players gonna player and typos happen
-                const current = simplify(card.title);
-                const maxMistakes = 2;
-                let mistakes = 0;
-                // Target index (expected title)
-                let t = 0;
-                // Current index (actual title)
-                let c = 0;
-                while ((t < target.length) && (c < current.length)) {
-                    if (current[c] === target[t]) {
-                        // Chars match, advance both
-                        t++; c++;
-                        continue;
-                    } else if (maxMistakes <= mistakes) {
-                        // Too many mistakes, this isn't the config card (I hope)
-                        return true;
-                    }
-                    // Allow for insertions, deletions, or substitutions
-                    mistakes++;
-                    (current[c + 1] === target[t])
-                    ? c++
-                    : (current[c] === target[t + 1])
-                    ? t++
-                    : (t++, c++)
-                }
-                // Count leftover chars as mistakes
-                mistakes += (target.length - t) + (current.length - c);
-                // This is basically bargain bin levenshtein distance but less costly
-                return (maxMistakes < mistakes);
-            })()) {
-                // Title didn't match the fuzzy search
+                // Title didn't match the fuzzy search, under either product name
                 continue;
             } else if (config.card === null) {
                 // Found the config card
@@ -776,19 +1250,24 @@ function InnerSelf(hook) {
             return Config.get(pending);
         }
         // Parse existing card content to extract user-modified settings
-        // This is where IS reads back what the player has configured
+        // This is where Chronicle reads back what the player has configured
         // Abomination :3
         ["entry", "description"].map(source => [source, (
             (typeof config.card[source] === "string")
             // Split on >, filter for lines with colons, extract key-value pairs
-            ? Object.fromEntries((config.card[source]
+            // Null prototype because these keys come from text the player can edit
+            ? Object.assign(Object.create(null), Object.fromEntries((config.card[source]
                 .split(/\s*>[\s>]*/)
                 .filter(block => block.includes(":"))
                 .map(block => block.split(/\s*:[\s:]*/, 2))
-            ).map(pair => [simplify(pair[0]), pair[1].trimEnd()])) : {}
+            ).map(pair => [simplify(pair[0]), pair[1].trimEnd()]))) : Object.create(null)
         )]).forEach(([source, extractive]) => template[source].forEach(cfg => (
             // Try to set each config value from extracted content (fallible mode)
-            cfg.setter?.(extractive[simplify(cfg.message)], true)
+            // A renamed row falls back to the label it carried under Inner Self, so an
+            // adventure that predates the rename keeps every value the player chose
+            cfg.setter?.(extractive[simplify(cfg.message)] ?? (
+                (typeof cfg.alias === "string") ? extractive[simplify(cfg.alias)] : undefined
+            ), true)
         )));
         // Merge all discovered agents: config, brain card metadata, and "@" pending
         config.agents = [...new Set([...(config.agents ?? fallback.agents), ...agents, ...pending])];
@@ -874,7 +1353,7 @@ function InnerSelf(hook) {
              * @param {string} name - Display name for the card
              * @returns {Object} The newly created card
              */
-            const buildCard = (name = this.name) => addStoryCard(
+            const buildCard = (name = this.name) => claim(addStoryCard(
                 JSON.stringify({ agent: this.name }),
                 (() => {
                     // Generate a pretty timestamp for the initialization comment
@@ -899,7 +1378,7 @@ function InnerSelf(hook) {
                 JSON.stringify({}),
                 // Thank you Mavrick
                 { returnCard: true }
-            );
+            ), name);
             /**
              * Checks if a card belongs to this agent
              * @param {Object} card - Card to check
@@ -910,6 +1389,29 @@ function InnerSelf(hook) {
                 && card.keys.includes("\"agent\"")
                 && (deserialize(card.keys).agent === this.name)
             );
+            // The six argument form of addStoryCard is an undocumented platform extension
+            // Where it is missing the call still creates the card, it just answers "true"
+            const claim = (built = null, name = this.name) => {
+                if (built && (typeof built === "object") && !Array.isArray(built)) {
+                    return built;
+                }
+                for (const card of storyCards) {
+                    if (isAgent(card)) {
+                        // The card was created, the platform simply did not hand it back
+                        return card;
+                    }
+                }
+                // Nothing to write to. A detached card keeps this turn alive and loses only
+                // the thought it was carrying, rather than throwing out of the hook
+                log(`Chronicle: story card creation returned no card for ${this.name}`);
+                return {
+                    keys: JSON.stringify({ agent: this.name }),
+                    entry: "",
+                    type: "Brain",
+                    title: name,
+                    description: "{}"
+                };
+            };
             if (typeof this.#indicator !== "string") {
                 // If no indicator is set, just find or create the card
                 for (const card of storyCards) {
@@ -993,16 +1495,38 @@ function InnerSelf(hook) {
             } else if (typeof this.card.description === "string") {
                 this.card.description = this.card.description.trim();
             } else {
+                // Story card "description" is undocumented, and it holds every brain here
+                // If the platform ever stops returning it, say so rather than quietly
+                // handing back an empty mind
+                if (!("description" in this.card)) {
+                    log(`Chronicle: story card notes are missing for ${this.name}, brain starts empty`);
+                }
                 this.card.description = "";
             }
             this.#brain = {};
+            /**
+             * Admits one parsed thought into the brain
+             * Card notes are player-editable text, so this is a trust boundary like any
+             * other: reserved property names and runaway keys are refused out loud
+             * @param {string} key - Parsed key
+             * @param {string} value - Parsed thought
+             * @returns {boolean} true if the thought was admitted
+             */
+            const admit = (key = "", value = "") => {
+                if (!safeKey(key)) {
+                    log(`Chronicle: refusing brain key ${JSON.stringify(key.slice(0, 40))} for ${this.name}`);
+                    return false;
+                }
+                this.#brain[key] = value;
+                return true;
+            };
             if (/^[\s{,]*"/.test(this.card.description) || /"[\s},]*$/.test(this.card.description)) {
                 let parsed = false;
                 // Parse the brain as JSON from the card description, with repairs allowed
                 const source = deserialize(this.card.description, true);
                 for (const key in source) {
                     // Only keep string values (the actual thoughts)
-                    (typeof source[key] === "string") && ((this.#brain[key] = source[key]), (parsed = true));
+                    (typeof source[key] === "string") && admit(key, source[key]) && (parsed = true);
                 }
                 if (parsed) {
                     // Conclude if the brain contains any string-valued properties
@@ -1031,7 +1555,7 @@ function InnerSelf(hook) {
                 ].map(twin => twin.replace(/(?:^[\s{},"_\\]*|[\s{},"_\\]*$)/g, ""));
                 if ((key !== "") && (value !== "")) {
                     // Only add if key and value are both non-empty
-                    this.#brain[key] = value;
+                    admit(key, value);
                 }
             }
             return this.#brain;
@@ -1052,10 +1576,2659 @@ function InnerSelf(hook) {
      * @returns {Object|undefined} The previous action or undefined
      */
     const getPrevAction = () => history.findLast(a => !/^[\u200B-\u200D]*$/.test(a?.text ?? a?.rawText ?? ""));
+    // ==================== MODULE A - TRANSACTION LEDGER ====================
+    /**
+     * Nothing is written to a story card during the turn that produced it
+     *
+     * Inner Self committed brain operations inside onOutput and guarded against doubles
+     * by hashing history. At output time history does not yet contain the generation being
+     * produced, so a retry hashes identically, bails out, and leaves the brain holding the
+     * thought from the generation the player threw away. Erase and continue failed the same
+     * way. The guard was real; it just pinned the wrong write.
+     *
+     * Chronicle stages instead. onOutput allocates labels, embeds their zero-width markers
+     * in the story text, and parks plain serializable descriptors in state.CHRONICLE.pending.
+     * The next turn commits them, but only once it can prove the generation that produced
+     * them actually survived into the story. Anything else is discarded and rolled back.
+     *
+     * Labels cannot be deferred with the rest: their markers have to be woven into the very
+     * text being returned. So labels are allocated at staging time and rolled back to
+     * labelStart when the transaction is discarded.
+     */
+    // Nothing grows without a byte cap, because 1500 turns is a long time
+    const CAP = Object.freeze({
+        // Longest thought a single operation may carry into state
+        thought: 2000,
+        // Longest brain key a single operation may carry into state
+        key: 60,
+        // Most operations one transaction may hold
+        ops: 8,
+        // Largest undo snapshot retained; a bigger commit simply keeps no undo
+        undo: 12000,
+        // Outcomes retained in the diagnostic journal
+        journal: 20,
+        // Stagings kept for one visible turn, in case onOutput fires once per retry candidate
+        candidates: 4
+    });
+    /**
+     * Key names that must never reach a brain map
+     * Assigning these can poison every object in the sandbox
+     * @type {string[]}
+     */
+    const reservedKeys = Object.freeze(["__proto__", "constructor", "prototype"]);
+    /**
+     * Own-property test that ignores everything inherited from Object.prototype
+     * ("constructor" in {}) is true, which is exactly the kind of thing model output finds
+     * @param {Object} obj - Object to test
+     * @param {string} key - Property name to test
+     * @returns {boolean} true if obj carries key as its own property
+     */
+    const own = (obj = null, key = "") => (
+        !!obj && (typeof obj === "object") && Object.prototype.hasOwnProperty.call(obj, key)
+    );
+    /**
+     * Validates a brain key before it is allowed into a staged operation
+     * @param {*} key - Candidate key
+     * @returns {boolean} true if the key is safe to store
+     */
+    const safeKey = (key = "") => (
+        (typeof key === "string")
+        && (key !== "")
+        && (key.length <= CAP.key)
+        && !reservedKeys.includes(key)
+    );
+    /**
+     * Converts a key name to valid snake_case
+     * Handles various edge cases from model output
+     * @param {string} k - Raw key string
+     * @returns {string} Valid snake_case key name
+     */
+    const formatKey = (k = "") => (k
+        .trim()
+        // Take the first word only
+        .split(/\s/, 1)[0]
+        // Remove quotes and apostrophes
+        .replace(/[.'`\u00B4\u2018\u2019]+/g, "")
+        // Replace non-alphanumerics with underscore
+        .replace(/[^a-z0-9A-Z_]/g, "_")
+        // Convert camelCase to snake_case
+        .replace(/([a-z0-9])([A-Z])/g, (_, a, b) => `${a}_${b.toLowerCase()}`)
+        .toLowerCase()
+        // Separate letters from numbers
+        .replace(/([a-z])([0-9])/g, (_, a, b) => `${a}_${b}`)
+        .replace(/([0-9])([a-z])/g, (_, a, b) => `${a}_${b}`)
+        // Clean up multiple underscores
+        .replace(/__+/g, "_")
+        // Remove leading/trailing underscores
+        .replace(/(?:^_|_$)/g, "")
+    );
+    /**
+     * Generates a path string for logging operations
+     * Helps brain logs imitate actual code for ease of understanding
+     * @param {string} name - The agent whose brain is being written
+     * @param {string} key - Property name to access
+     * @returns {string} Path like "agent_name.brain" or "agent_name.key"
+     */
+    const path = (name = "", key = "brain") => `${(() => {
+        const fancy = formatKey(name);
+        return (fancy === "") ? `agents[${JSON.stringify(name)}]` : fancy;
+    })()}.${key}`;
+    /**
+     * Generates a delete log statement
+     * @param {string} name - The agent whose brain is being written
+     * @param {string} k - Key being deleted
+     * @returns {string} JavaScript delete statement
+     */
+    const logDelete = (name = "", k = "") => `delete ${path(name)}${(k === "") ? "[\"\"]" : `.${k}`};`;
+    /**
+     * Strips a string down to the part a retry cannot change by accident
+     * Zero-width chars go first: they are the label markers, and they legitimately differ
+     * @param {string} str - Raw action or output text
+     * @returns {string} Normalized text
+     */
+    const normalize = (str = "") => (
+        (typeof str === "string")
+        ? str.replace(/[\u200B-\u200D\uFEFF]+/g, "").replace(/\s+/g, " ").trim()
+        : ""
+    );
+    /**
+     * Fingerprints a generation so a later turn can recognize it in history
+     * @param {string} str - Raw text
+     * @returns {string} Short stable fingerprint
+     */
+    const fingerprint = (str = "") => {
+        const clean = normalize(str);
+        let n = 0;
+        for (let i = 0; i < clean.length; i++) {
+            // Classic polynomial rolling hash, nothing fancy
+            n = ((31 * n) + clean.charCodeAt(i)) | 0;
+        }
+        return `${clean.length.toString(36)}.${(n >>> 0).toString(16)}`;
+    };
+    /**
+     * Reads the platform's action counter, falling back to history length
+     * Mirrors how Auto-Cards reads the same value, negatives and all
+     * @returns {number} Current action count
+     */
+    const getActionCount = () => (
+        Number.isInteger(info?.actionCount) ? Math.abs(info.actionCount) : history.length
+    );
+    /**
+     * Appends one bounded outcome to the diagnostic journal
+     * @param {string} kind - What happened
+     * @param {Object} [detail] - Small extra facts
+     * @returns {void}
+     */
+    const journal = (kind = "", detail = {}) => {
+        if (!Array.isArray(CH.journal)) {
+            CH.journal = [];
+        }
+        CH.journal.push({ turn: getActionCount(), kind, ...detail });
+        if (CH.journal.length > CAP.journal) {
+            CH.journal.splice(0, CH.journal.length - CAP.journal);
+        }
+        return;
+    };
+    /**
+     * Throws away the staged transaction and undoes everything staging changed
+     * Labels roll back so a retried turn reuses them instead of burning through the counter
+     * @param {string} why - Reason, recorded in the journal
+     * @returns {boolean} true if something was actually discarded
+     */
+    const discardPending = (why = "") => {
+        const candidates = (Array.isArray(CH.candidates) && (0 < CH.candidates.length))
+            ? CH.candidates
+            : (CH.pending ? [CH.pending] : []);
+        CH.pending = null;
+        CH.candidates = [];
+        IS.encoding = "";
+        if (candidates.length === 0) {
+            return false;
+        }
+        // Rewind to where the earliest of these transactions found the counter, so a batch
+        // of candidates costs no more labels than the one the player kept would have
+        const earliest = candidates.reduce((lowest, candidate) => (
+            Number.isInteger(candidate?.labelStart) ? Math.min(lowest, candidate.labelStart) : lowest
+        ), Number.MAX_SAFE_INTEGER);
+        if ((earliest !== Number.MAX_SAFE_INTEGER) && (0 <= earliest) && (earliest < IS.label)) {
+            IS.label = earliest;
+        }
+        CH.stats.discards++;
+        journal("discard", { why, ops: candidates.reduce((n, c) => (n + (Array.isArray(c.ops) ? c.ops.length : 0)), 0) });
+        return true;
+    };
+    /**
+     * Applies one operation descriptor to an in-memory brain map
+     * Descriptors are data, never closures, because closures do not survive a turn
+     * Returns the log line for the operation, or null if the operation was refused
+     * @param {Object} op - Operation descriptor
+     * @param {Object} brain - The agent's parsed brain, mutated in place
+     * @returns {string|null} Log line, or null when nothing was applied
+     */
+    const applyOp = (op = null, brain = {}, cfg = {}) => {
+        if (!op || (typeof op !== "object") || Array.isArray(op)) {
+            return null;
+        }
+        if (op.mod !== "brain") {
+            // Every other module writes through the same ledger, one turn later, so a
+            // discarded generation cannot leave a clock advanced or a secret spread
+            return applyModuleOp(op, cfg);
+        }
+        const name = (typeof op.agent === "string") ? op.agent : "";
+        if ((name === "") || !safeKey(op.key)) {
+            return null;
+        }
+        // A model only ever sees bare key names, so map its write back onto the pinned key
+        const key = resolveKey(brain, op.key, cfg.tiers === true);
+        if ((cfg.tiers === true) && isCore(key) && ((op.op === "delete") || (op.op === "rename"))) {
+            // Core thoughts are what the character is. They are not negotiable, even when
+            // the model asks nicely and even when it asks in the right format
+            log(`Chronicle: refused to ${op.op} the pinned thought ${bareKey(key)} of ${name}`);
+            journal("refused", { agent: name, key: bareKey(key).slice(0, 24) });
+            return null;
+        }
+        if (op.op === "delete") {
+            if (!own(brain, key)) {
+                // The player may have edited this key away between staging and now
+                return null;
+            }
+            delete brain[key];
+            return logDelete(name, key);
+        }
+        if (op.op === "rename") {
+            const from = resolveKey(brain, op.from, cfg.tiers === true);
+            if (!safeKey(from) || !own(brain, from) || (from === key) || (
+                (cfg.tiers === true) && isCore(from)
+            )) {
+                return null;
+            }
+            brain[key] = brain[from];
+            delete brain[from];
+            const p = path(name);
+            return `${p}.${key} = ${p}.${from};\n${logDelete(name, from)}`;
+        }
+        if (op.op === "merge") {
+            // Two cold long-term thoughts become one, which is how a brain forgets detail
+            // without forgetting what happened
+            const from = (Array.isArray(op.from) ? op.from : []).filter(k => own(brain, k) && !isCore(k));
+            const summary = (typeof op.value === "string") ? op.value.trim() : "";
+            if ((from.length < 2) || (summary === "") || !Number.isInteger(op.label) || (op.label < 1)) {
+                return null;
+            }
+            for (const stale of from) {
+                delete brain[stale];
+            }
+            brain[key] = `${op.label} \u2192 ${summary}`;
+            const p = path(name);
+            return `${p}.${key} = ${JSON.stringify(brain[key])};\n${from.map(k => logDelete(name, k)).join("\n")}`;
+        }
+        if (op.op !== "set") {
+            return null;
+        }
+        const thought = (typeof op.value === "string") ? op.value : "";
+        if ((thought === "") || !Number.isInteger(op.label) || (op.label < 1)) {
+            return null;
+        }
+        const target = `${path(name)}.${key}`;
+        const old = own(brain, key) ? brain[key] : undefined;
+        brain[key] = `${op.label} \u2192 ${thought}`;
+        // Determine if this is a relabel of the same thought value
+        const relabel = (
+            (typeof old === "string")
+            && (thought === old.slice(old.indexOf("\u2192") + 1).trim())
+        );
+        return `${(
+            relabel ? `old = ${target};\n` : ""
+        )}${target} = ${(
+            relabel ? `[${op.label}, old${(
+                old.includes("\u2192") ? "\n  .slice(old.indexOf(\"\u2192\") + 1)\n  .trim()\n" : ".trim()"
+            )}].join(" \u2192 ")` : JSON.stringify(brain[op.key])
+        )};`;
+    };
+    /**
+     * Serializes a brain into the story card notes
+     * Rapidly reserializes a flat representation without heavy memory allocations
+     * This custom serialization is faster than JSON.stringify for flat objects
+     * It also produces a more readable format in the story card notes
+     * @param {Object} brain - The agent's brain
+     * @param {boolean} json - Show raw JSON instead of the friendly format
+     * @returns {string} Serialized brain
+     */
+    const serializeBrain = (brain = {}, json = false) => {
+        const keys = Object.keys(brain);
+        if (keys.length === 0) {
+            return "{}";
+        }
+        // Build the JSON-like string manually for each key-value pair
+        let serialized = "";
+        const appendPair = json ? ((
+            serialized = `"${keys[0]}": ${JSON.stringify(brain[keys[0]])}`
+        ), (key = "") => {
+            // Format -> "key": "value",\n\n (JSON with linebreaks)
+            serialized += `,\n\n"${key}": ${JSON.stringify(brain[key])}`;
+            return;
+        }) : ((
+            serialized = `${keys[0]}: ${brain[keys[0]]}`
+        ), (key = "") => {
+            // Format -> key: value\n\n (simple user-friendly format)
+            serialized += `\n\n${key}: ${brain[key]}`;
+            return;
+        });
+        for (let i = 1; i < keys.length; i++) {
+            appendPair(keys[i]);
+        }
+        return serialized;
+    };
+    /**
+     * Commits the staged transaction to the agent's brain card
+     *
+     * Every write lands in local variables first and reaches the card in one pass at the
+     * end, so an exception anywhere in the middle leaves the card exactly as it was
+     * @returns {boolean} true if a transaction was committed
+     */
+    const commitPending = () => {
+        const pending = CH.pending;
+        // Clear first: a transaction that throws must never get a second attempt
+        CH.pending = null;
+        IS.encoding = "";
+        if (
+            !pending || (typeof pending !== "object")
+            || !Array.isArray(pending.ops) || (pending.ops.length === 0)
+            || (typeof pending.agent !== "string")
+        ) {
+            return false;
+        }
+        try {
+            const cfg = commitConfig(pending);
+            // A transaction can belong to no one: time passing and clocks turning happen
+            // whether or not anybody was thinking
+            const agent = (pending.agent === "") ? null : new Agent(pending.agent, {
+                percent: Number.isInteger(pending.percent) ? pending.percent : 30
+            });
+            const card = agent ? agent.card : null;
+            if (agent && (!card || (typeof card !== "object") || Array.isArray(card))) {
+                // The platform did not hand back a usable card, so there is nowhere to write
+                log("Chronicle: brain card unavailable, transaction dropped");
+                journal("dropped", { why: "no card" });
+                return false;
+            }
+            const brain = agent ? agent.brain : {};
+            const before = {
+                entry: (card && (typeof card.entry === "string")) ? card.entry : "",
+                description: (card && (typeof card.description === "string")) ? card.description : "",
+                label: IS.label,
+                ops: IS.ops,
+                // Cheap copies, taken before anything in this transaction is applied
+                world: cfg.world ? JSON.parse(JSON.stringify(CH.world)) : null,
+                clocks: cfg.clocks ? JSON.parse(JSON.stringify(CH.clocks)) : null,
+                bonds: cfg.bonds ? JSON.parse(JSON.stringify(CH.bonds)) : null
+            };
+            let entry = before.entry;
+            if (entry.endsWith("UTC") && entry.startsWith("// initialized @")) {
+                // This is a fresh brain card with only the timestamp comment
+                // Log this info immediately before processing the first valid operation
+                // Add metadata and initialize the brain object in the log
+                entry = `${entry.trimStart()}\n${path(pending.agent, "metadata")} = ${(
+                    JSON.stringify(agent.metadata, null, 2)
+                )};\n${path(pending.agent)} = {};\n// Entry: Displays recent brain operations to the player\n// Triggers: Configurable settings for this NPC alone\n// Notes: Allows the player to view/edit actual brain contents`;
+            }
+            if (cfg.world) {
+                // Module C: the card is authoritative, so a hand edit made since this
+                // transaction was staged wins over anything state remembers
+                readWorld("");
+            }
+            if (cfg.bonds && agent) {
+                // Module I: same rule, a standing edited by hand on the card wins
+                syncBondFromCard(pending.agent, brain);
+                // Let module operations reach this brain, for the mirror back
+                cfg.brain = brain;
+                cfg.brainAgent = pending.agent;
+            }
+            let ops = IS.ops;
+            let applied = 0;
+            const record = (line = "") => {
+                ops++;
+                applied++;
+                entry = `${entry}\n\n// operation ${ops}\n${line}`.trimStart();
+            };
+            for (const op of pending.ops) {
+                const line = applyOp(op, brain, cfg);
+                if (typeof line !== "string") {
+                    // Refused: an unsafe descriptor, or a key the player already removed
+                    CH.stats.refused++;
+                    continue;
+                }
+                record(line);
+                if (cfg.knows && (op.mod === "brain") && ((op.op === "set") || (op.op === "merge"))) {
+                    // A thought is a fact its owner holds, and facts are what spread
+                    applyModuleOp({
+                        mod: "fact",
+                        op: "assert",
+                        key: `${pending.agent}:${bareKey(String(op.key))}`.slice(0, 60),
+                        value: String(op.value),
+                        cls: classify(String(op.value)),
+                        knownBy: Array.isArray(pending.actors) ? pending.actors : [pending.agent]
+                    }, cfg);
+                }
+            }
+            if (applied === 0) {
+                journal("empty", { ops: pending.ops.length });
+                return false;
+            }
+            if (agent) {
+                const seeded = seedCore(brain, pending.agent, cfg);
+                if (seeded !== null) {
+                    record(seeded);
+                }
+                // Policy eviction, rather than asking the model which memory to burn
+                for (const line of evictIfNeeded(brain, pending.agent, cfg)) {
+                    record(line);
+                }
+                // Keep the operation log from growing unbounded
+                // Limit to approximately 2000 chars to satisfy AID's soft entry limit
+                card.entry = entry.split(/\n\n/).slice(-2000).reduceRight((out, op) => (
+                    // Only include operations that fit within the char limit
+                    ((out.length + op.length + 2) < 2001) ? `${op}${out ? `\n\n${out}` : ""}` : out
+                ), "");
+                card.description = serializeBrain(brain, pending.json === true);
+            }
+            // Rumour moves exactly once per accepted turn, never on a retry
+            propagateFacts(cfg, Array.isArray(pending.agents) ? pending.agents : []);
+            if (cfg.world) {
+                writeWorld();
+            }
+            IS.ops = ops;
+            CH.stats.commits++;
+            CH.undo = (
+                ((before.entry.length + before.description.length) <= CAP.undo)
+                ? {
+                    agent: pending.agent,
+                    turn: pending.actionCount,
+                    entry: before.entry,
+                    description: before.description,
+                    label: before.label,
+                    ops: before.ops,
+                    // A transaction is more than its thought: the day it moved, the clock
+                    // it turned and the standing it changed all belong to the same undo
+                    world: before.world,
+                    clocks: before.clocks,
+                    bonds: before.bonds
+                }
+                // An oversized snapshot is not worth the state budget it would cost
+                : null
+            );
+            journal("commit", { ops: applied, agent: pending.agent });
+            enforceStateBudget(cfg);
+            return true;
+        } catch (error) {
+            // A commit must never throw out of a hook, whatever the cards contain
+            log(`Chronicle: transaction dropped (${error?.message ?? "unknown error"})`);
+            journal("dropped", { why: "threw" });
+            return false;
+        }
+    };
+    /**
+     * Resolves whatever transaction is staged, at the top of every hook
+     *
+     * Commits only when both hold:
+     * - the action counter has moved past the turn that staged it, and
+     * - the generation that staged it can still be found in history
+     * A retry satisfies neither, because the discarded generation never entered history
+     * and the counter never advanced. Anything unresolved is discarded silently.
+     * @returns {void}
+     */
+    const settlePending = ({ discardStale = true } = {}) => {
+        // Every staging this turn produced, newest last. AI Dungeon generates retry
+        // candidates as a batch, and it is not established whether onOutput fires once per
+        // batch or once per candidate. If it fires per candidate then several transactions
+        // exist for one visible turn, only one of which the player will ever see, so the
+        // ledger keeps them all and lets history decide which one was real
+        const candidates = (Array.isArray(CH.candidates) && (0 < CH.candidates.length))
+            ? CH.candidates
+            : (CH.pending ? [CH.pending] : []);
+        if (candidates.length === 0) {
+            return;
+        }
+        const turn = getActionCount();
+        if (candidates.every(candidate => (
+            !Number.isInteger(candidate?.actionCount) || (turn <= candidate.actionCount)
+        ))) {
+            if (!discardStale) {
+                // Called from onOutput, where a transaction already staged for this same
+                // turn is a sibling candidate from the same batch, not a superseded retry.
+                // A real retry is discarded by the context hook, which runs first
+                return;
+            }
+            // Still the same turn, so this is a retry, an erase, or an interrupted generation
+            discardPending("turn did not advance");
+            return;
+        }
+        /**
+         * Does this generation appear in history?
+         * Its zero-width markers count as proof too, in case another modifier reshaped the
+         * text on the way out
+         * @param {Object} candidate
+         * @returns {boolean}
+         */
+        const survived = (candidate) => {
+            if (!candidate || !Number.isInteger(candidate.actionCount) || (turn <= candidate.actionCount)) {
+                return false;
+            }
+            for (let [i, checked] = [history.length - 1, 0]; (-1 < i) && (checked < 4); i--) {
+                const action = history[i];
+                if (!action || (action.type !== "continue")) {
+                    continue;
+                }
+                checked++;
+                const actionText = action.text ?? action.rawText ?? "";
+                if (fingerprint(actionText) === candidate.fingerprint) {
+                    return true;
+                }
+                if (
+                    (typeof candidate.encoding === "string") && (candidate.encoding !== "")
+                    && (typeof actionText === "string") && actionText.includes(candidate.encoding)
+                ) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        // The last staging that matches history wins. The others were candidates the
+        // player never saw, and are rolled back with everything else
+        let chosen = null;
+        for (let i = candidates.length - 1; (-1 < i) && (chosen === null); i--) {
+            if (survived(candidates[i])) {
+                chosen = candidates[i];
+            }
+        }
+        if (chosen === null) {
+            discardPending("generation not found in history");
+            return;
+        }
+        const rollback = candidates.reduce((lowest, candidate) => (
+            Number.isInteger(candidate?.labelStart) ? Math.min(lowest, candidate.labelStart) : lowest
+        ), Number.MAX_SAFE_INTEGER);
+        CH.candidates = [];
+        CH.pending = chosen;
+        const committed = commitPending();
+        if (committed) {
+            // Labels burned by candidates nobody saw are released, so the counter stays
+            // dense across the turns that actually happened
+            const highest = chosen.ops.reduce((top, op) => (
+                Number.isInteger(op?.label) ? Math.max(top, op.label) : top
+            ), Number.isInteger(rollback) ? rollback : 0);
+            if ((0 < highest) && (highest < IS.label)) {
+                IS.label = highest;
+            }
+        }
+        return;
+    };
+    // ==================== MODULE J - DIAGNOSTICS AND SAFETY RAILS ====================
+    /**
+     * How long this hook has been running
+     * @returns {number} Milliseconds since the hook began
+     */
+    const elapsed = () => (Date.now() - started);
+    /**
+     * Decides whether optional work still fits inside the hook's time budget
+     * Optional work is anything the adventure survives without: audits, compression,
+     * knowledge propagation, diagnostics. Story text is never optional
+     * @param {Object} config - Validated config
+     * @param {number} need - Rough cost of the work, in milliseconds
+     * @returns {boolean} true if there is room
+     */
+    const affordable = (config = {}, need = 50) => {
+        if (config.diag !== true) {
+            // Without the diagnostics module there is no rail, and behaviour is unchanged
+            return true;
+        }
+        if (need < (config.timeBudget - elapsed())) {
+            return true;
+        }
+        CH.diag.skips++;
+        log(`Chronicle: skipped optional work at ${elapsed()}ms of ${config.timeBudget}ms`);
+        return false;
+    };
+    /**
+     * Records how long a hook took, keeping a short window per hook
+     * @param {string} name - Hook name
+     * @returns {void}
+     */
+    const recordTiming = (name = "") => {
+        const window = CH.diag.hooks[name];
+        if (!Array.isArray(window)) {
+            return;
+        }
+        window.push(elapsed());
+        if (window.length > 20) {
+            window.splice(0, window.length - 20);
+        }
+        return;
+    };
+    /**
+     * Keeps the adventure's saved state inside its budget
+     * Warns at 60% and trims at 85%, dropping the most expendable things first
+     * @param {Object} config - Validated config
+     * @returns {void}
+     */
+    const enforceStateBudget = (config = {}) => {
+        if (config.diag !== true) {
+            return;
+        }
+        const measure = () => JSON.stringify(state).length;
+        const limit = config.stateChars;
+        let size = measure();
+        if (size < (limit * 0.6)) {
+            CH.diag.warned = false;
+            return;
+        }
+        if (size < (limit * 0.85)) {
+            if (!CH.diag.warned) {
+                CH.diag.warned = true;
+                log(`Chronicle: state at ${size} of ${limit} chars`);
+            }
+            return;
+        }
+        // Trim in order of expendability, stopping as soon as the state fits again
+        const trims = [
+            ["undo snapshot", () => { CH.undo = null; }],
+            ["staging log", () => { CH.diag.stagings = []; }],
+            ["profile history", () => { CH.budget.changes = []; }],
+            ["compliance window", () => {
+                CH.compliance.window = (CH.compliance.window || []).slice(-8);
+            }],
+            ["spare retry candidates", () => {
+                CH.candidates = (Array.isArray(CH.candidates) && CH.pending) ? [CH.pending] : [];
+            }],
+            ["journal", () => { CH.journal = CH.journal.slice(-5); }],
+            ["event log", () => { CH.events = CH.events.slice(-Math.ceil(CH.events.length / 2)); }],
+            ["stale beliefs", () => { CH.stale = {}; }],
+            ["reference counts", () => { CH.mem = {}; }],
+            ["facts", () => {
+                const keys = Object.keys(CH.facts).sort((a, b) => (CH.facts[a].turn - CH.facts[b].turn));
+                for (const key of keys.slice(0, Math.ceil(keys.length / 2))) {
+                    delete CH.facts[key];
+                }
+            }],
+            ["diagnostics", () => { CH.diag.hooks = { input: [], context: [], output: [] }; }]
+        ];
+        for (const [what, trim] of trims) {
+            trim();
+            size = measure();
+            log(`Chronicle: trimmed ${what}, state now ${size} chars`);
+            journal("trim", { what });
+            if (size < (limit * 0.85)) {
+                return;
+            }
+        }
+        return;
+    };
+    // ==================== SHARED MODULE PLUMBING ====================
+    /**
+     * Finds a Chronicle-owned story card by its title, or builds it
+     * Cards are looked up by an index cached in state, so a forty card adventure does not
+     * pay for a full scan every turn. The index is validated on use, so a stale entry
+     * simply costs one scan
+     * @param {string} title - Card title
+     * @param {string} entry - Initial entry, used only when the card is built
+     * @param {string} description - Initial notes, used only when the card is built
+     * @returns {Object|null} The card, or null if the platform refused to make one
+     */
+    const ownCard = (title = "", entry = "", description = "") => {
+        const cached = CH.index[title];
+        if (Number.isInteger(cached) && storyCards[cached] && (storyCards[cached].title === title)) {
+            CH.diag.hits = (CH.diag.hits || 0) + 1;
+            return storyCards[cached];
+        }
+        CH.diag.misses = (CH.diag.misses || 0) + 1;
+        for (let i = 0; i < storyCards.length; i++) {
+            if (storyCards[i] && (storyCards[i].title === title)) {
+                CH.index[title] = i;
+                return storyCards[i];
+            }
+        }
+        const built = addStoryCard(title, entry, "Chronicle", title, description, { returnCard: true });
+        if (built && (typeof built === "object") && !Array.isArray(built)) {
+            CH.index[title] = storyCards.indexOf(built);
+            return built;
+        }
+        for (let i = 0; i < storyCards.length; i++) {
+            if (storyCards[i] && (storyCards[i].title === title)) {
+                CH.index[title] = i;
+                return storyCards[i];
+            }
+        }
+        log(`Chronicle: could not create the ${title} card`);
+        return null;
+    };
+    /**
+     * Reads "key: value" lines out of player-editable card text
+     * Player text is untrusted like any other: keys are bounded and values are trimmed
+     * @param {string} source - Card text
+     * @returns {Object} Null-prototype map of lowercase key to value
+     */
+    const readLines = (source = "") => {
+        const out = Object.create(null);
+        if (typeof source !== "string") {
+            return out;
+        }
+        for (const line of source.split("\n").slice(0, 200)) {
+            const clean = line.trim();
+            const bisector = clean.indexOf(":");
+            if ((clean === "") || (bisector < 1)) {
+                continue;
+            }
+            const key = clean.slice(0, bisector).trim().toLowerCase().slice(0, 40);
+            const value = clean.slice(bisector + 1).trim().slice(0, 400);
+            if ((key !== "") && !reservedKeys.includes(key)) {
+                out[key] = value;
+            }
+        }
+        return out;
+    };
+    /**
+     * Splits a semicolon list from card text into bounded entries
+     * @param {string} value - Raw list
+     * @param {number} max - Most entries to keep
+     * @returns {string[]}
+     */
+    const readList = (value = "", max = 6) => (
+        (typeof value === "string")
+        ? value.split(/\s*;\s*/).map(part => part.trim().slice(0, 120)).filter(part => (part !== "")).slice(0, max)
+        : []
+    );
+    /**
+     * The settings a commit needs, captured while the config card is still in hand
+     * A commit happens one hook later, where building the config again would cost a full
+     * card scan; these are the settings that were in force when the generation happened
+     * @param {Object} config - Validated config
+     * @returns {Object} Small serializable settings snapshot
+     */
+    const moduleConfig = (config = {}) => ({
+        tiers: (config.tiers === true),
+        core: config.core,
+        brainChars: config.brainChars,
+        promote: config.promote,
+        world: (config.world === true),
+        maxDays: config.maxDays,
+        knows: (config.knows === true),
+        eventChars: config.eventChars,
+        rumor: config.rumor,
+        clocks: (config.clocks === true),
+        bonds: (config.bonds === true),
+        bondTurns: config.bondTurns,
+        audit: (config.audit === true),
+        diag: (config.diag === true),
+        stateChars: config.stateChars,
+        timeBudget: config.timeBudget
+    });
+    /** The settings a commit falls back on when a transaction predates them */
+    const commitConfig = (pending = {}) => ({
+        tiers: false, core: 5, brainChars: 4000, promote: 2, world: false, maxDays: 30,
+        knows: false, eventChars: 3000, rumor: 10, clocks: false, bonds: false,
+        bondTurns: 150, audit: false, diag: false, stateChars: 40000, timeBudget: 1200,
+        ...((pending && (typeof pending.cfg === "object") && pending.cfg) || {})
+    });
+    // ==================== MODULE B - TIERED MEMORY ====================
+    /**
+     * The prefix that pins a thought
+     * It is deliberately a character formatKey() destroys, so no model output can ever mint
+     * a core thought or address one directly. Only the player and this module can
+     */
+    const CORE = "#";
+    /**
+     * Is this a pinned core thought?
+     * @param {string} key
+     * @returns {boolean}
+     */
+    const isCore = (key = "") => ((typeof key === "string") && key.startsWith(CORE));
+    /**
+     * The key as the model sees it, with any tier marker stripped
+     * @param {string} key
+     * @returns {string}
+     */
+    const bareKey = (key = "") => (isCore(key) ? key.slice(CORE.length) : key);
+    /**
+     * Resolves a key the model wrote against the keys a brain actually holds
+     * A model refreshing a pinned thought writes the bare name, because that is all it was
+     * shown; this maps that write back onto the pinned key instead of forking a duplicate
+     * @param {Object} brain - The agent's brain
+     * @param {string} key - Key as written by the model
+     * @param {boolean} tiers - Is the tiered memory module on?
+     * @returns {string} The key to actually write
+     */
+    const resolveKey = (brain = {}, key = "", tiers = false) => (
+        (tiers && !own(brain, key) && own(brain, `${CORE}${key}`)) ? `${CORE}${key}` : key
+    );
+    /**
+     * Per-agent memory metadata, created on demand
+     * @param {string} agentName
+     * @returns {Object} { seen: {key: turn}, hits: {key: count}, turn: number, compress: string[] }
+     */
+    const memoryOf = (agentName = "") => {
+        if (!CH.mem[agentName] || (typeof CH.mem[agentName] !== "object")) {
+            CH.mem[agentName] = { seen: {}, hits: {}, turn: -1, compress: [] };
+        }
+        const mem = CH.mem[agentName];
+        mem.seen = (mem.seen && (typeof mem.seen === "object")) ? mem.seen : {};
+        mem.hits = (mem.hits && (typeof mem.hits === "object")) ? mem.hits : {};
+        mem.compress = Array.isArray(mem.compress) ? mem.compress : [];
+        return mem;
+    };
+    /**
+     * Records that a thought was linked to something that happened in the story
+     * Called when a thought's label decodes out of the story text, which is the only
+     * evidence Chronicle has that a thought ever mattered
+     * @param {string} agentName - Whose thought
+     * @param {string[]} keys - Keys whose labels appeared
+     * @returns {void}
+     */
+    const touchThoughts = (agentName = "", keys = []) => {
+        const mem = memoryOf(agentName);
+        const turn = getActionCount();
+        if (mem.turn === turn) {
+            // Already counted this turn, so a retry cannot inflate the numbers
+            return;
+        }
+        mem.turn = turn;
+        for (const key of keys.slice(0, 32)) {
+            if (!safeKey(key)) {
+                continue;
+            }
+            mem.seen[key] = turn;
+            mem.hits[key] = Math.min((mem.hits[key] || 0) + 1, 1000);
+        }
+        // Metadata for keys that no longer exist is dead weight
+        const live = new Set(keys);
+        for (const key of Object.keys(mem.seen)) {
+            if (!live.has(key) && ((turn - mem.seen[key]) > 500)) {
+                delete mem.seen[key];
+                delete mem.hits[key];
+            }
+        }
+        return;
+    };
+    /**
+     * Sorts a brain's keys into tiers
+     * Core is pinned and untouchable. Long-term has proven itself by being linked to the
+     * story often enough. Working is everything else, and is what eviction eats first
+     * @param {Object} brain - The agent's brain
+     * @param {string} agentName - Whose brain
+     * @param {Object} cfg - Commit settings
+     * @returns {Object} { core, long, working } arrays of keys
+     */
+    const tiersOf = (brain = {}, agentName = "", cfg = {}) => {
+        const mem = memoryOf(agentName);
+        const core = [];
+        const long = [];
+        const working = [];
+        for (const key of Object.keys(brain)) {
+            if (isCore(key)) {
+                core.push(key);
+            } else if ((mem.hits[key] || 0) >= cfg.promote) {
+                long.push(key);
+            } else {
+                working.push(key);
+            }
+        }
+        // Least recently referenced first, so eviction always takes the coldest thought
+        const coldest = (a, b) => ((mem.seen[a] || 0) - (mem.seen[b] || 0));
+        long.sort(coldest);
+        working.sort(coldest);
+        return { core, long, working };
+    };
+    /**
+     * How many characters of thought a brain is holding
+     * @param {Object} brain
+     * @returns {number}
+     */
+    const brainSize = (brain = {}) => Object.keys(brain).reduce(
+        (total, key) => (total + key.length + String(brain[key]).length + 4), 0
+    );
+    /**
+     * Enforces the brain's byte cap by policy instead of by asking the model
+     *
+     * Inner Self handed the model a "delete something" prompt whenever a brain grew too
+     * large, which over a long adventure means the model eventually deletes the thing that
+     * defines the character. Chronicle evicts the coldest working thought instead, and asks
+     * the model for help only when there is no working thought left to take
+     * @param {Object} brain - Mutated in place
+     * @param {string} agentName - Whose brain
+     * @param {Object} cfg - Commit settings
+     * @returns {string[]} Log lines for the operation log
+     */
+    const evictIfNeeded = (brain = {}, agentName = "", cfg = {}) => {
+        const lines = [];
+        if (!cfg.tiers) {
+            return lines;
+        }
+        const mem = memoryOf(agentName);
+        // The core tier is capped. Anything over the cap is demoted rather than deleted,
+        // because a player who pinned six things meant all six of them
+        const pinned = Object.keys(brain).filter(isCore).filter(key => (key !== BOND_STORE));
+        if (cfg.core < pinned.length) {
+            const coldest = (a, b) => ((mem.seen[a] || 0) - (mem.seen[b] || 0));
+            for (const key of pinned.sort(coldest).slice(0, pinned.length - cfg.core)) {
+                const bare = bareKey(key);
+                if (!own(brain, bare)) {
+                    brain[bare] = brain[key];
+                }
+                delete brain[key];
+                lines.push(`// core tier is full, so this thought is no longer pinned
+${path(agentName)}.${bare} = ${path(agentName)}["${key}"];`);
+            }
+        }
+        let guard = 0;
+        while ((brainSize(brain) > cfg.brainChars) && (guard++ < 16)) {
+            const { long, working } = tiersOf(brain, agentName, cfg);
+            if (working.length > 0) {
+                const key = working[0];
+                delete brain[key];
+                delete mem.seen[key];
+                delete mem.hits[key];
+                lines.push(`// evicted the coldest working thought\n${logDelete(agentName, key)}`);
+                journal("evict", { agent: agentName, key: key.slice(0, 24) });
+                continue;
+            }
+            if (long.length > 1) {
+                // Nothing left to drop outright, so ask for a summary of the two coldest
+                // long-term thoughts and merge them on a later turn
+                mem.compress = [long[0], long[1]];
+                lines.push(`// requested compression of ${bareKey(long[0])} and ${bareKey(long[1])}`);
+                journal("compress", { agent: agentName });
+                break;
+            }
+            // Only core thoughts remain, and those are never taken
+            break;
+        }
+        return lines;
+    };
+    /**
+     * Seeds a character with one pinned thought taken from their own story card
+     *
+     * A brain that starts empty has nothing to protect, so the first eviction has nothing
+     * to refuse. This gives every character one fact about themselves that the system will
+     * defend for the rest of the adventure
+     * @param {Object} brain - Mutated in place
+     * @param {string} agentName
+     * @param {Object} cfg - Commit settings
+     * @returns {string|null} Log line, or null if there was nothing to seed
+     */
+    const seedCore = (brain = {}, agentName = "", cfg = {}) => {
+        if (!cfg.tiers || Object.keys(brain).some(key => (isCore(key) && (key !== BOND_STORE)))) {
+            return null;
+        }
+        const source = storyCards.find(card => (
+            card && (typeof card.title === "string")
+            && (card.title.trim().toLowerCase() === agentName.toLowerCase())
+            && !((typeof card.keys === "string") && card.keys.includes("\"agent\""))
+        ));
+        if (!source || (typeof source.entry !== "string")) {
+            return null;
+        }
+        const sentence = source.entry.replace(/\s+/g, " ").trim().split(/(?<=[.!?])\s/)[0];
+        if (!sentence || (sentence.length < 12)) {
+            return null;
+        }
+        const key = `${CORE}defining_fact`;
+        brain[key] = sentence.slice(0, 200);
+        journal("seed", { agent: agentName });
+        return `// pinned from ${agentName}'s own story card, and never evicted
+${path(agentName)}["${key}"] = ${JSON.stringify(brain[key])};`;
+    };
+    /**
+     * Prompt for the compression task, adapted from the Auto-Cards memory compression
+     * prompt so both halves of this file ask for summaries in the same voice
+     * @param {string} agentName - Whose thoughts
+     * @param {string[]} pair - The two thoughts being merged
+     * @returns {string}
+     */
+    const compressionPrompt = (agentName = "", pair = []) => `
+<SYSTEM>
+# STRICT OUTPUT FORMAT
+You must output one short parenthetical task followed by the story continuation.
+
+## SHORT TASK (REQUIRED)
+- Start your output **immediately** with: (compress = \`One merged sentence.\`)
+- Summarize and condense the two older thoughts below into a single memory
+- Ensure the merged thought retains the core meaning and most essential details
+- Prioritize information-density, accuracy, and completeness
+- Write it from ${agentName}'s own first person perspective, as one short sentence
+- Only reference information present in the two thoughts themselves, be specific
+- These are old memories, so write firmly about what already happened
+
+## THE TWO OLD THOUGHTS
+1. ${pair[0] ?? ""}
+2. ${pair[1] ?? ""}
+
+## STORY CONTINUATION (REQUIRED)
+- After the closing parenthesis, write **one space** and then continue the story
+</SYSTEM>
+    `.trim();
+    // ==================== MODULE C - WORLD CHRONICLE ====================
+    /**
+     * How narrative phrasing maps onto the calendar
+     * This table is meant to be edited: add the phrasings your scenario actually uses
+     * Order matters, the first match wins, so keep the specific phrases above the vague ones
+     * @type {Object[]}
+     */
+    const TIME_TABLE = Object.freeze([
+        { pattern: /\[\s*\+\s*(\d{1,3})\s*days?\s*\]/i, days: null },
+        { pattern: /\b(?:a|one) fortnight(?: later| passes)?\b/i, days: 14 },
+        { pattern: /\b(?:several|a few) weeks?\b/i, days: 21 },
+        { pattern: /\b(?:the )?(?:next|following) week\b/i, days: 7 },
+        { pattern: /\ba week (?:later|passes|goes by)\b/i, days: 7 },
+        { pattern: /\b(?:several|a few|some) days (?:later|pass|go by)\b/i, days: 3 },
+        { pattern: /\b(?:a couple of|two) days (?:later|pass)\b/i, days: 2 },
+        { pattern: /\bthe (?:day|morning) after (?:next|tomorrow)\b/i, days: 2 },
+        { pattern: /\b(?:the )?(?:next|following) (?:morning|day|dawn|evening)\b/i, days: 1 },
+        { pattern: /\bthat night(?:,| ) (?:you|he|she|they) sleep\b/i, days: 1 },
+        { pattern: /\btomorrow\b/i, days: 1 },
+        { pattern: /\bmonths? (?:later|pass)\b/i, days: 30 },
+        { pattern: /\ba year (?:later|passes)\b/i, days: 30 }
+    ]);
+    /** The world card's field order, which is also its priority order when space runs out */
+    const WORLD_FIELDS = Object.freeze([
+        { key: "date", label: "Date", priority: 1 },
+        { key: "place", label: "Location", priority: 2 },
+        { key: "arc", label: "Arc", priority: 3 },
+        { key: "threats", label: "Open threats", priority: 4, list: true },
+        { key: "debts", label: "Open debts", priority: 5, list: true },
+        { key: "factions", label: "Standing", priority: 6, map: true },
+        { key: "lost", label: "Lost to memory", priority: 7, list: true }
+    ]);
+    /**
+     * Reads the world card into state
+     * The card wins every conflict, so a player who edits it is always right
+     * @param {Object} config - Validated config
+     * @returns {Object} The world state
+     */
+    const readWorld = (startDate = "") => {
+        const world = CH.world;
+        if (world.date === "") {
+            world.date = startDate || "Day 1";
+        }
+        const card = ownCard(
+            "Chronicle",
+            "The world as Chronicle currently understands it.",
+            WORLD_FIELDS.map(field => `${field.label}: ${(
+                (field.key === "date") ? (startDate || world.date || "Day 1") : ""
+            )}`).join("\n")
+        );
+        if (!card) {
+            return world;
+        }
+        const lines = readLines(card.description);
+        for (const field of WORLD_FIELDS) {
+            const raw = lines[field.label.toLowerCase()];
+            if (typeof raw !== "string") {
+                continue;
+            }
+            if (field.list) {
+                world[field.key] = readList(raw);
+            } else if (field.map) {
+                const map = {};
+                for (const part of readList(raw, 12)) {
+                    const match = part.match(/^(.+?)\s*([+-]?\d{1,3})$/);
+                    if (match) {
+                        map[match[1].trim().slice(0, 40)] = Math.max(-99, Math.min(99, parseInt(match[2], 10)));
+                    }
+                }
+                world[field.key] = map;
+            } else {
+                world[field.key] = raw.slice(0, 120);
+            }
+        }
+        return world;
+    };
+    /**
+     * Writes state back to the world card, so the player can see and edit it
+     * @returns {void}
+     */
+    const writeWorld = () => {
+        const card = ownCard("Chronicle", "The world as Chronicle currently understands it.", "");
+        if (!card) {
+            return;
+        }
+        const world = CH.world;
+        card.description = WORLD_FIELDS.map(field => {
+            const value = world[field.key];
+            if (field.list) {
+                return `${field.label}: ${(Array.isArray(value) ? value : []).join("; ")}`;
+            }
+            if (field.map) {
+                return `${field.label}: ${Object.entries(value || {}).map(([k, v]) => `${k} ${(0 <= v) ? "+" : ""}${v}`).join("; ")}`;
+            }
+            return `${field.label}: ${value ?? ""}`;
+        }).join("\n");
+        card.entry = "The world as Chronicle currently understands it. Edit the notes below and Chronicle will believe you.";
+        return;
+    };
+    /**
+     * Renders the world block for injection, dropping whole lines when space runs out
+     * A half sentence about a debt is worse than no sentence about a debt
+     * @param {number} maxChars - Hard cap on the rendered block
+     * @param {string[]} extra - Extra lines from other modules, already priority ordered
+     * @returns {string}
+     */
+    const renderWorld = (maxChars = 700, extra = [], lean = false) => {
+        const world = CH.world;
+        const lines = [];
+        for (const field of WORLD_FIELDS) {
+            const value = world[field.key];
+            const rendered = (
+                field.list ? (Array.isArray(value) ? value : []).join("; ")
+                : field.map ? Object.entries(value || {}).map(([k, v]) => `${k} ${(0 <= v) ? "+" : ""}${v}`).join("; ")
+                : String(value ?? "")
+            );
+            if (rendered !== "") {
+                lines.push({ priority: field.priority, text: `- ${field.label}: ${rendered}` });
+            }
+        }
+        for (const [i, line] of extra.entries()) {
+            lines.push({ priority: 8 + i, text: `- ${line}` });
+        }
+        if (lines.length === 0) {
+            return "";
+        }
+        lines.sort((a, b) => (a.priority - b.priority));
+        if (lean) {
+            // Comma joined, on as few lines as the budget allows
+            let joined = "";
+            for (const line of lines) {
+                const candidate = joined ? `${joined}; ${line.text.slice(2)}` : line.text.slice(2);
+                if ((candidate.length + 9) > maxChars) {
+                    continue;
+                }
+                joined = candidate;
+            }
+            return (joined === "") ? "" : `# World: ${joined}\n\n`;
+        }
+        const header = "# The world as it stands: [";
+        let out = "";
+        for (const line of lines) {
+            const candidate = `${out}${line.text}\n`;
+            if ((header.length + candidate.length + 2) > maxChars) {
+                // Drop this line whole and keep trying the lower priority ones, which are
+                // often shorter and may still fit
+                continue;
+            }
+            out = candidate;
+        }
+        return (out === "") ? "" : `${header}\n${out}]\n\n`;
+    };
+    /**
+     * Reads the calendar forward out of narrative text
+     * @param {string} source - The turn's prose
+     * @param {number} maxDays - Hard cap for one turn without an explicit marker
+     * @returns {number} Days to advance, zero if nothing matched
+     */
+    const readTimePassage = (source = "", maxDays = 30) => {
+        if (typeof source !== "string") {
+            return 0;
+        }
+        const sample = source.slice(0, 4000);
+        for (const rule of TIME_TABLE) {
+            const match = sample.match(rule.pattern);
+            if (!match) {
+                continue;
+            }
+            if (rule.days === null) {
+                // An explicit [+n days] marker is the player or author being deliberate,
+                // so it is trusted beyond the per-turn cap
+                const days = parseInt(match[1], 10);
+                return (Number.isInteger(days) && (0 < days)) ? Math.min(days, 3650) : 0;
+            }
+            return Math.min(rule.days, maxDays);
+        }
+        return 0;
+    };
+    /**
+     * Advances the in-game date by a number of days
+     * Understands "Day 12" natively and otherwise appends a day count, because a scenario
+     * may use any calendar it likes and Chronicle should not pretend to know it
+     * @param {number} days
+     * @returns {string} The new date
+     */
+    const advanceDate = (days = 0) => {
+        const world = CH.world;
+        world.day = Math.max(1, Math.min(world.day + days, 100000));
+        const match = String(world.date).match(/^(.*?)(\d+)(.*)$/);
+        world.date = (
+            match
+            ? `${match[1]}${Math.max(1, Math.min(parseInt(match[2], 10) + days, 100000))}${match[3]}`
+            : `${world.date} (+${world.day - 1} days)`
+        );
+        return world.date;
+    };
+    // ==================== MODULE D - ENSEMBLE ====================
+    /** Words that turn a name into a mention rather than an action */
+    const MENTION_WORDS = Object.freeze([
+        "about", "from", "of", "to", "for", "with", "like", "than", "toward", "towards",
+        "near", "against", "without", "unlike", "regarding", "concerning", "and", "or"
+    ]);
+    /**
+     * Who is actually present, as opposed to merely named
+     *
+     * A character who is spoken about is furniture. A character who acts or speaks is in
+     * the scene. The difference is worth getting right, because it decides who thinks
+     * @param {Object} config - Validated config
+     * @param {number} lookBack - How many recent actions count as "the scene"
+     * @returns {Object[]} [{ name, recency }] most recently active first
+     */
+    const presentAgents = (config = {}, lookBack = 2) => {
+        const found = new Map();
+        let scanned = 0;
+        for (let i = history.length - 1; (-1 < i) && (scanned < lookBack); i--) {
+            const actionText = history[i]?.text ?? history[i]?.rawText ?? "";
+            if ((typeof actionText !== "string") || /^[\s\u200B-\u200D]*$/.test(actionText)) {
+                continue;
+            }
+            scanned++;
+            const lower = actionText.toLowerCase();
+            for (const name of config.agents) {
+                if (found.has(name)) {
+                    continue;
+                }
+                const needle = name.toLowerCase();
+                for (let p = lower.indexOf(needle); (p !== -1); p = lower.indexOf(needle, p + 1)) {
+                    const before = (0 < p) ? lower.charCodeAt(p - 1) : 0;
+                    const after = ((p + needle.length) < lower.length) ? lower.charCodeAt(p + needle.length) : 0;
+                    if (((97 <= before) && (before <= 122)) || ((97 <= after) && (after <= 122))) {
+                        // Part of a longer word, not a name
+                        continue;
+                    }
+                    // A name preceded by "about" or "from" is being discussed, not acting
+                    const preceding = lower.slice(Math.max(0, p - 24), Math.max(0, p - 1)).trim().split(/[\s,]+/).pop();
+                    if (MENTION_WORDS.includes(preceding)) {
+                        continue;
+                    }
+                    // Acting or speaking: a verb-ish word follows, or dialogue is nearby
+                    const following = lower.slice(p + needle.length, p + needle.length + 24).trim();
+                    const sentence = lower.slice(Math.max(0, p - 120), p + 120);
+                    if (/^[a-z']+/.test(following) || /["«»„“”「」]/.test(sentence)) {
+                        found.set(name, scanned);
+                        break;
+                    }
+                }
+            }
+        }
+        return [...found.entries()]
+            .map(([name, recency]) => ({ name, recency }))
+            .sort((a, b) => (a.recency - b.recency));
+    };
+    // ==================== MODULE E - KNOWLEDGE MODEL ====================
+    /**
+     * How far a fact travels on its own
+     * Public facts are common knowledge almost immediately; sealed facts never move unless
+     * someone carries them deliberately, which is what makes an intercepted letter matter
+     * @type {Object}
+     */
+    const VISIBILITY = Object.freeze({
+        public: 4,
+        household: 1,
+        private: 0.25,
+        sealed: 0
+    });
+    /** Phrases that classify how far a new fact should be able to travel */
+    const VISIBILITY_TABLE = Object.freeze([
+        { pattern: /\b(?:announce|proclaim|public|crowd|market|everyone|whole (?:town|city))\b/i, cls: "public" },
+        { pattern: /\b(?:secret|sealed|hidden|conceal|nobody|no one|never tell|swear)\b/i, cls: "sealed" },
+        { pattern: /\b(?:household|servant|guild|crew|family|kitchen|staff)\b/i, cls: "household" }
+    ]);
+    /** Phrases that tag what kind of event a turn contained */
+    const EVENT_TABLE = Object.freeze([
+        { pattern: /\b(?:kill|blood|blade|strike|fight|wound)\w*\b/i, tag: "violence" },
+        { pattern: /\b(?:promise|swear|vow|oath)\w*\b/i, tag: "promise" },
+        { pattern: /\b(?:pay|coin|mark|debt|owe|purse)\w*\b/i, tag: "money" },
+        { pattern: /\b(?:letter|message|note|manifest|ledger)\w*\b/i, tag: "document" },
+        { pattern: /\b(?:leave|depart|ride|sail|arrive|return)\w*\b/i, tag: "movement" },
+        { pattern: /\b(?:threat|warn|danger|hunt|search)\w*\b/i, tag: "threat" }
+    ]);
+    /**
+     * Classifies a new fact by how far it should travel
+     * @param {string} text
+     * @returns {string} A key of VISIBILITY
+     */
+    const classify = (text = "") => {
+        for (const rule of VISIBILITY_TABLE) {
+            if (rule.pattern.test(text)) {
+                return rule.cls;
+            }
+        }
+        return "private";
+    };
+    /**
+     * Tags what kind of thing happened this turn
+     * @param {string} text
+     * @returns {string}
+     */
+    const tagEvent = (text = "") => {
+        for (const rule of EVENT_TABLE) {
+            if (rule.pattern.test(text)) {
+                return rule.tag;
+            }
+        }
+        return "scene";
+    };
+    /**
+     * Trims the event log to its byte cap, oldest first
+     * @param {number} maxChars
+     * @returns {void}
+     */
+    const trimEvents = (maxChars = 3000) => {
+        let size = JSON.stringify(CH.events).length;
+        while ((size > maxChars) && (CH.events.length > 1)) {
+            CH.events.shift();
+            size = JSON.stringify(CH.events).length;
+        }
+        return;
+    };
+    /**
+     * Spreads facts to people who were not there
+     *
+     * Called once per committed turn, never on a retry, so a discarded generation cannot
+     * leak a secret that was never told
+     * @param {Object} config - Commit settings
+     * @param {string[]} agents - Everyone who could hear
+     * @returns {number} How many facts moved
+     */
+    const propagateFacts = (config = {}, agents = []) => {
+        if (!config.knows || (config.rumor <= 0)) {
+            return 0;
+        }
+        let moved = 0;
+        for (const key of Object.keys(CH.facts)) {
+            const fact = CH.facts[key];
+            if (!fact || !Array.isArray(fact.known)) {
+                continue;
+            }
+            const rate = (VISIBILITY[fact.cls] ?? 0) * (config.rumor / 100);
+            if (rate <= 0) {
+                continue;
+            }
+            for (const agentName of agents) {
+                if (fact.known.includes(agentName)) {
+                    continue;
+                }
+                if (Math.random() < rate) {
+                    fact.known.push(agentName);
+                    moved++;
+                    // Whatever they used to believe about this is now out of date
+                    if (CH.stale[agentName] && CH.stale[agentName][key]) {
+                        delete CH.stale[agentName][key];
+                    }
+                }
+            }
+        }
+        return moved;
+    };
+    /**
+     * What an agent has missed, and what they still wrongly believe
+     * @param {string} agentName
+     * @param {number} maxChars
+     * @returns {string[]} Rendered lines
+     */
+    const blindSpots = (agentName = "", maxChars = 400) => {
+        const lines = [];
+        const missed = CH.events
+            .filter(event => Array.isArray(event.a) && !event.a.includes(agentName))
+            .slice(-3);
+        for (const event of missed) {
+            lines.push(`${agentName} did not witness: ${event.tag} involving ${(event.a || []).join(" and ") || "no one known"}${event.p ? ` at ${event.p}` : ""} (${event.t})`);
+        }
+        const stale = CH.stale[agentName] || {};
+        for (const key of Object.keys(stale).slice(0, 2)) {
+            const belief = stale[key];
+            if (belief && (typeof belief.value === "string")) {
+                lines.push(`${agentName} still believes, wrongly: ${belief.value}`);
+            }
+        }
+        let total = 0;
+        return lines.filter(line => {
+            total += line.length + 3;
+            return (total <= maxChars);
+        });
+    };
+    // ==================== MODULE F - CLOCKS AND CONSEQUENCES ====================
+    /**
+     * Reads the clock definitions the player authored
+     *
+     * Clocks advance on declared triggers and on nothing else. A clock that could advance
+     * because the scene felt tense would be a mood ring, not a clock
+     * @returns {Object} name -> { value, max, trigger, consequence, locked, reset }
+     */
+    const readClocks = () => {
+        const card = ownCard("Chronicle Clocks", [
+            "Progress clocks. Each clock fills only when its trigger phrase appears in the story.",
+            "Edit the notes below to author your own.",
+            "",
+            "Format:",
+            "clock_name: 0/8",
+            "  trigger: the phrase that advances it",
+            "  consequence: what happens when it fills",
+            "  reset: true"
+        ].join("\n"), [
+            "example_clock: 0/6",
+            "  trigger: the watch searches the barge",
+            "  consequence: the guild moves against the watch openly",
+            "  after: (optional) a phrase the story must reach first",
+            "  reset: false"
+        ].join("\n"));
+        const clocks = Object.create(null);
+        if (!card || (typeof card.description !== "string")) {
+            return clocks;
+        }
+        let current = null;
+        for (const line of card.description.split("\n").slice(0, 120)) {
+            const indented = /^\s+/.test(line);
+            const clean = line.trim();
+            if (clean === "") {
+                continue;
+            }
+            const bisector = clean.indexOf(":");
+            if (bisector < 1) {
+                continue;
+            }
+            const key = clean.slice(0, bisector).trim().toLowerCase();
+            const value = clean.slice(bisector + 1).trim();
+            if (!indented) {
+                const shape = value.match(/^(\d{1,3})\s*\/\s*(\d{1,3})$/);
+                if (!shape || !safeKey(key)) {
+                    current = null;
+                    continue;
+                }
+                const max = Math.max(1, Math.min(parseInt(shape[2], 10), 100));
+                current = {
+                    value: Math.max(0, Math.min(parseInt(shape[1], 10), max)),
+                    max,
+                    trigger: "",
+                    consequence: "",
+                    condition: "",
+                    locked: false,
+                    reset: false
+                };
+                clocks[key] = current;
+            } else if (current) {
+                if (key === "trigger") {
+                    current.trigger = value.slice(0, 120).toLowerCase();
+                } else if (key === "consequence") {
+                    current.consequence = value.slice(0, 200);
+                } else if ((key === "after") || (key === "condition")) {
+                    // The consequence waits for this phrase to appear before it surfaces
+                    current.condition = value.slice(0, 120).toLowerCase();
+                } else if (key === "reset") {
+                    current.reset = /^(?:true|yes|on|1)$/i.test(value);
+                } else if (key === "locked") {
+                    current.locked = /^(?:true|yes|on|1)$/i.test(value);
+                }
+            }
+        }
+        // State remembers progress; the card remembers definitions
+        for (const [name, clock] of Object.entries(clocks)) {
+            const stored = CH.clocks[name];
+            if (stored && Number.isInteger(stored.value)) {
+                clock.value = Math.max(0, Math.min(stored.value, clock.max));
+                clock.locked = (stored.locked === true);
+            }
+        }
+        return clocks;
+    };
+    /**
+     * Writes clock progress back to the card, so the player can watch the tension build
+     * @param {Object} clocks
+     * @returns {void}
+     */
+    const writeClocks = (clocks = {}) => {
+        const card = ownCard("Chronicle Clocks", "", "");
+        if (!card || (typeof card.description !== "string")) {
+            return;
+        }
+        card.description = card.description.split("\n").map(line => {
+            if (/^\s/.test(line)) {
+                return line;
+            }
+            const bisector = line.indexOf(":");
+            if (bisector < 1) {
+                return line;
+            }
+            const name = line.slice(0, bisector).trim().toLowerCase();
+            const clock = clocks[name];
+            return clock ? `${line.slice(0, bisector)}: ${clock.value}/${clock.max}` : line;
+        }).join("\n");
+        return;
+    };
+    /**
+     * Which clocks a turn's text declared a trigger for
+     * @param {Object} clocks
+     * @param {string} source - The turn's prose
+     * @returns {string[]} Clock names to advance
+     */
+    const triggeredClocks = (clocks = {}, source = "") => {
+        if (typeof source !== "string") {
+            return [];
+        }
+        const lower = source.toLowerCase();
+        return Object.entries(clocks)
+            .filter(([, clock]) => (
+                !clock.locked && (clock.trigger !== "") && lower.includes(clock.trigger)
+            ))
+            .map(([name]) => name);
+    };
+    /**
+     * The consequences due to surface now
+     * @returns {Object[]} Queue entries ready to fire
+     */
+    const dueConsequences = () => {
+        const turn = getActionCount();
+        // A condition is a phrase the story must have reached, which is what lets a letter
+        // written at turn 300 wait for the right hands rather than the right turn number
+        const recent = history.slice(-6).map(a => (a?.text ?? "")).join(" ").toLowerCase();
+        return CH.queue.filter(item => (
+            item && !item.fired
+            && Number.isInteger(item.fireAtTurn) && (item.fireAtTurn <= turn)
+            && ((typeof item.condition !== "string") || (item.condition === "") || recent.includes(item.condition))
+        )).slice(0, 2);
+    };
+    // ==================== MODULE I - BONDS ====================
+    /** The ladder, in order. Position is the whole point: it cannot be skipped upward */
+    const BOND_STAGES = Object.freeze([
+        "unknown",
+        "noticed",
+        "sought out",
+        "trusted with something costly",
+        "defended publicly",
+        "privately committed",
+        "formally bound"
+    ]);
+    /** The reserved key the model writes a bond advance into */
+    const BOND_KEY = "bond";
+    /** Where the bond is kept on the brain card, in the reserved namespace */
+    const BOND_STORE = `${CORE}bond`;
+    /**
+     * Reads a bond back off a brain card
+     * The card wins, exactly as it does for the world chronicle, so a player who edits a
+     * standing by hand is right and Chronicle is wrong
+     * @param {string} agentName
+     * @param {Object} brain
+     * @returns {void}
+     */
+    const syncBondFromCard = (agentName = "", brain = {}) => {
+        if (!own(brain, BOND_STORE)) {
+            return;
+        }
+        const written = String(brain[BOND_STORE]);
+        const index = BOND_STAGES.findIndex(stage => written.toLowerCase().includes(stage));
+        if (index !== -1) {
+            const bond = bondOf(agentName);
+            bond.stage = index;
+        }
+        return;
+    };
+    /**
+     * Writes the bond onto the brain card, where the player can see and edit it
+     * @param {string} agentName
+     * @param {Object} brain - Mutated in place
+     * @returns {void}
+     */
+    const syncBondToCard = (agentName = "", brain = {}) => {
+        brain[BOND_STORE] = `standing with the player: ${BOND_STAGES[bondOf(agentName).stage]}`;
+        return;
+    };
+    /**
+     * An agent's bond record, created on demand
+     * @param {string} agentName
+     * @returns {Object} { stage, turn }
+     */
+    const bondOf = (agentName = "") => {
+        if (!CH.bonds[agentName] || (typeof CH.bonds[agentName] !== "object")) {
+            CH.bonds[agentName] = { stage: 0, turn: -100000 };
+        }
+        const bond = CH.bonds[agentName];
+        bond.stage = Number.isInteger(bond.stage) ? Math.max(0, Math.min(bond.stage, 6)) : 0;
+        bond.turn = Number.isInteger(bond.turn) ? bond.turn : -100000;
+        return bond;
+    };
+    /**
+     * Turns whatever the model wrote into a bond step
+     * Accepts a stage name or a number, because models will write both
+     * @param {string} agentName
+     * @param {string} value - Raw value from the parenthetical
+     * @returns {number} The requested delta, before any clamping
+     */
+    const readBondRequest = (agentName = "", value = "") => {
+        const bond = bondOf(agentName);
+        const clean = String(value).toLowerCase().trim();
+        const digits = clean.match(/-?\d+/);
+        if (digits) {
+            const wanted = parseInt(digits[0], 10);
+            // A bare small number is a delta, a number on the ladder is a target
+            return ((-1 <= wanted) && (wanted <= 1)) ? wanted : (wanted - bond.stage);
+        }
+        if (/\b(?:down|back|break|broken|lost|colder|worse)\b/.test(clean)) {
+            return -1;
+        }
+        const index = BOND_STAGES.findIndex(stage => clean.includes(stage));
+        return (index === -1) ? 1 : (index - bond.stage);
+    };
+    // ==================== MODULE G - CONTINUITY AUDITOR ====================
+    /**
+     * Prompt for the audit task
+     * The auditor reports, it never repairs: a confident wrong correction does more damage
+     * to a long adventure than the inconsistency it was trying to fix
+     * @param {string} playerName
+     * @returns {string}
+     */
+    const auditPrompt = (playerName = "") => `
+<SYSTEM>
+# STRICT OUTPUT FORMAT
+You must output one short parenthetical task followed by the story continuation.
+
+## SHORT TASK (REQUIRED)
+- Start your output **immediately** with: (audit = \`One sentence.\`)
+- Compare the current scene against the world facts listed above
+- If a fact contradicts the scene, state the single clearest contradiction in one sentence
+- If everything is consistent, write exactly: (audit = \`No contradictions found.\`)
+- Do not fix anything, do not change the story to match, only report
+- Never invent a contradiction to have something to say
+
+## STORY CONTINUATION (REQUIRED)
+- After the closing parenthesis, write **one space** and then continue the story
+- Continue from ${playerName}'s perspective, exactly as if nothing had been asked
+</SYSTEM>
+    `.trim();
+    /**
+     * Is an audit due?
+     * @param {Object} config
+     * @returns {boolean}
+     */
+    const auditDue = (config = {}) => (
+        (config.audit === true)
+        && (config.auditEvery <= (getActionCount() - (CH.audit.last || 0)))
+    );
+    // ==================== MODULE OPERATIONS ====================
+    /**
+     * Applies one non-brain operation descriptor
+     *
+     * Every module writes through here, on the next turn, inside the same transaction as
+     * the thought that accompanied it. A module that wrote directly would be a hole in the
+     * ledger: a retry would roll back the thought and leave the clock advanced
+     * @param {Object} op - Operation descriptor
+     * @param {Object} cfg - Commit settings captured at staging time
+     * @returns {string|null} Log line, or null if the operation was refused
+     */
+    const applyModuleOp = (op = null, cfg = {}) => {
+        if (!op || (typeof op !== "object") || Array.isArray(op)) {
+            return null;
+        }
+        if (op.mod === "world") {
+            if (op.op === "advanceDays") {
+                const days = Number.isInteger(op.n) ? Math.max(1, Math.min(op.n, 3650)) : 0;
+                if (days === 0) {
+                    return null;
+                }
+                return `world.date = ${JSON.stringify(advanceDate(days))};`;
+            }
+            if (op.op === "set") {
+                const field = WORLD_FIELDS.find(f => (f.key === op.field));
+                if (!field || (typeof op.value !== "string")) {
+                    return null;
+                }
+                CH.world[field.key] = op.value.slice(0, 120);
+                return `world.${field.key} = ${JSON.stringify(CH.world[field.key])};`;
+            }
+            if (op.op === "lose") {
+                // A thought that fell out of a brain becomes a hole in the world, not silence
+                if (typeof op.value !== "string") {
+                    return null;
+                }
+                CH.world.lost = [...CH.world.lost, op.value.slice(0, 120)].slice(-3);
+                return `world.lost.push(${JSON.stringify(op.value.slice(0, 120))});`;
+            }
+            return null;
+        }
+        if (op.mod === "clock") {
+            if ((op.op !== "tick") || !safeKey(op.id)) {
+                return null;
+            }
+            const clocks = readClocks();
+            const clock = clocks[op.id];
+            if (!clock || clock.locked) {
+                return null;
+            }
+            const step = Number.isInteger(op.n) ? Math.max(1, Math.min(op.n, clock.max)) : 1;
+            clock.value = Math.min(clock.value + step, clock.max);
+            const lines = [`clocks.${op.id} = "${clock.value}/${clock.max}";`];
+            if (clock.value >= clock.max) {
+                // A full clock is a promise the story already made
+                CH.queue = [...CH.queue, {
+                    id: `${op.id}-${getActionCount()}`,
+                    fireAtTurn: getActionCount() + 1,
+                    condition: clock.condition || "",
+                    payload: clock.consequence || `${op.id} comes due`,
+                    fired: false
+                }].slice(-12);
+                lines.push(`queue.push(${JSON.stringify(clock.consequence || op.id)});`);
+                if (clock.reset) {
+                    clock.value = 0;
+                    lines.push(`clocks.${op.id} = "0/${clock.max}";`);
+                } else {
+                    clock.locked = true;
+                    lines.push(`clocks.${op.id}.locked = true;`);
+                }
+            }
+            CH.clocks[op.id] = { value: clock.value, locked: clock.locked };
+            writeClocks(clocks);
+            return lines.join("\n");
+        }
+        if (op.mod === "queue") {
+            if (op.op !== "fire") {
+                return null;
+            }
+            const ids = Array.isArray(op.ids) ? op.ids.slice(0, 4) : [];
+            const fired = [];
+            CH.queue = CH.queue.filter(item => {
+                if (item && ids.includes(item.id)) {
+                    fired.push(item.payload);
+                    return false;
+                }
+                return true;
+            });
+            return (fired.length === 0) ? null : `queue.fired(${JSON.stringify(fired)});`;
+        }
+        if (op.mod === "bond") {
+            if ((op.op !== "step") || (typeof op.npc !== "string") || (op.npc === "")) {
+                return null;
+            }
+            const bond = bondOf(op.npc);
+            const turn = getActionCount();
+            const wanted = Number.isInteger(op.delta) ? op.delta : 0;
+            if (wanted === 0) {
+                return null;
+            }
+            if (0 < wanted) {
+                // Upward is one rung at a time, and never before the cooldown has passed
+                if ((turn - bond.turn) < cfg.bondTurns) {
+                    CH.stats.refused++;
+                    return null;
+                }
+                if (bond.stage >= (BOND_STAGES.length - 1)) {
+                    return null;
+                }
+                bond.stage++;
+            } else {
+                // Downward may skip, because trust breaks faster than it forms
+                bond.stage = Math.max(0, bond.stage + wanted);
+            }
+            bond.turn = turn;
+            if (cfg.brain && (op.npc === cfg.brainAgent)) {
+                // Mirror it into the reserved namespace on that character card
+                syncBondToCard(op.npc, cfg.brain);
+            }
+            return `bonds.${formatKey(op.npc) || "npc"} = ${JSON.stringify(BOND_STAGES[bond.stage])};`;
+        }
+        if (op.mod === "event") {
+            if (op.op !== "record") {
+                return null;
+            }
+            const event = {
+                t: getActionCount(),
+                a: (Array.isArray(op.actors) ? op.actors : []).filter(a => (typeof a === "string")).slice(0, 6),
+                p: (typeof op.place === "string") ? op.place.slice(0, 60) : "",
+                tag: (typeof op.tag === "string") ? op.tag.slice(0, 24) : "scene"
+            };
+            CH.events = [...CH.events, event].slice(-200);
+            trimEvents(cfg.eventChars);
+            return `events.push({ turn: ${event.t}, tag: ${JSON.stringify(event.tag)} });`;
+        }
+        if (op.mod === "fact") {
+            if ((op.op !== "assert") || !safeKey(op.key) || (typeof op.value !== "string")) {
+                return null;
+            }
+            const previous = CH.facts[op.key];
+            const known = (Array.isArray(op.knownBy) ? op.knownBy : []).filter(a => (typeof a === "string")).slice(0, 8);
+            if (previous && (typeof previous.value === "string") && (previous.value !== op.value)) {
+                // Anyone who knew the old version and did not witness the change keeps
+                // believing it, which is the entire point of this module
+                for (const holder of (Array.isArray(previous.known) ? previous.known : [])) {
+                    if (known.includes(holder)) {
+                        continue;
+                    }
+                    CH.stale[holder] = CH.stale[holder] || {};
+                    CH.stale[holder][op.key] = { value: previous.value, turn: previous.turn };
+                }
+            }
+            CH.facts[op.key] = {
+                value: op.value.slice(0, 200),
+                turn: getActionCount(),
+                cls: Object.prototype.hasOwnProperty.call(VISIBILITY, op.cls) ? op.cls : "private",
+                known
+            };
+            // Facts are capped like everything else, oldest first
+            const keys = Object.keys(CH.facts);
+            if (keys.length > 60) {
+                for (const key of keys.sort((a, b) => (CH.facts[a].turn - CH.facts[b].turn)).slice(0, keys.length - 60)) {
+                    delete CH.facts[key];
+                }
+            }
+            return null;
+        }
+        if (op.mod === "audit") {
+            if ((op.op !== "record") || (typeof op.value !== "string")) {
+                return null;
+            }
+            CH.audit.last = getActionCount();
+            const clean = op.value.trim().slice(0, 300);
+            const clear = /^no contradictions?/i.test(clean);
+            CH.audit.findings = [...(clear ? [] : [{ t: getActionCount(), text: clean }]), ...CH.audit.findings].slice(0, 10);
+            const card = ownCard("Chronicle Continuity Log", "Contradictions Chronicle noticed. Nothing here is corrected automatically, because a confident wrong correction is worse than a flagged inconsistency.", "");
+            if (card) {
+                card.description = CH.audit.findings.length
+                    ? CH.audit.findings.map(finding => `Turn ${finding.t}: ${finding.text}`).join("\n\n")
+                    : "No contradictions found so far.";
+            }
+            if (!clear) {
+                state.message = `Chronicle noticed a possible contradiction: ${clean}`;
+            }
+            return `audit.report(${JSON.stringify(clean.slice(0, 80))});`;
+        }
+        return null;
+    };
+    // ==================== MODULE K - RUNTIME BUDGET AUTOSCALING ====================
+    /**
+     * What the model can actually hold, and what Chronicle is allowed to spend of it
+     *
+     * The context available to the supported models spans thirty to one over subscription
+     * tiers, the Optimized Context toggle, and credits spent per action. On GLM the credit
+     * extension is charged per action, so this number genuinely moves turn to turn inside a
+     * single adventure. info.maxChars is therefore read every turn and never cached.
+     *
+     * Edit this table to change how Chronicle behaves at each size. Nothing else in the
+     * file hardcodes an injection budget
+     * @type {Object[]}
+     */
+    const BUDGET_TABLE = Object.freeze([
+        // name, ceiling on maxChars, then the budgets that apply below that ceiling
+        { name: "XS", upTo: 12000, chronicle: 350, brains: 1, digests: 0, witness: 0, clockLines: 1, audit: 0, injectPercent: 12 },
+        { name: "S", upTo: 32000, chronicle: 500, brains: 1, digests: 2, witness: 0, clockLines: 1, audit: 150, injectPercent: 20 },
+        { name: "M", upTo: 80000, chronicle: 700, brains: 2, digests: 3, witness: 1, clockLines: 2, audit: 100, injectPercent: 30 },
+        { name: "L", upTo: 200000, chronicle: 700, brains: 3, digests: 4, witness: 2, clockLines: 99, audit: 75, injectPercent: 35 },
+        { name: "XL", upTo: Infinity, chronicle: 900, brains: 4, digests: 99, witness: 99, clockLines: 99, audit: 75, injectPercent: 40 }
+    ]);
+    /**
+     * The order in which features are given up when the context shrinks
+     * Ordered, never proportional: the world and the character's own core thoughts are the
+     * last things to shrink, and they never disappear entirely
+     * @type {string[]}
+     */
+    const DEGRADE_ORDER = Object.freeze([
+        "audit", "witness", "digests", "brains", "bondNote", "clockLines", "chronicle"
+    ]);
+    /** Two consecutive turns at a new size before switching, so a wobble does not thrash */
+    const PROFILE_HYSTERESIS = 2;
+    /**
+     * Classifies the context the model has this turn
+     * @param {number} maxChars
+     * @returns {Object} A row of BUDGET_TABLE
+     */
+    const profileFor = (maxChars = 0) => {
+        const size = (Number.isFinite(maxChars) && (0 < maxChars)) ? maxChars : 0;
+        return BUDGET_TABLE.find(row => (size < row.upTo)) || BUDGET_TABLE[BUDGET_TABLE.length - 1];
+    };
+    /**
+     * Settles on a profile, with hysteresis, and records the change
+     * @param {number} maxChars - This turn's reading, never a cached one
+     * @returns {Object} The profile in force
+     */
+    const settleProfile = (maxChars = 0) => {
+        const observed = profileFor(maxChars);
+        const budget = CH.budget;
+        budget.maxChars = maxChars;
+        // A retried turn re-reads the same context size; it is not new evidence
+        const repeat = (budget.turn === getActionCount());
+        budget.turn = getActionCount();
+        if (repeat && (budget.profile !== "")) {
+            return BUDGET_TABLE.find(row => (row.name === budget.profile)) || observed;
+        }
+        if (budget.profile === "") {
+            // First reading of the adventure, adopt it immediately
+            budget.profile = observed.name;
+            budget.candidate = observed.name;
+            budget.streak = 0;
+            return observed;
+        }
+        if (observed.name === budget.profile) {
+            budget.candidate = observed.name;
+            budget.streak = 0;
+            return observed;
+        }
+        budget.streak = (budget.candidate === observed.name) ? (budget.streak + 1) : 1;
+        budget.candidate = observed.name;
+        if (budget.streak < PROFILE_HYSTERESIS) {
+            // Not yet convinced. Keep spending at the old size
+            return BUDGET_TABLE.find(row => (row.name === budget.profile)) || observed;
+        }
+        const from = budget.profile;
+        budget.profile = observed.name;
+        budget.streak = 0;
+        budget.changes = [...(budget.changes || []), { turn: getActionCount(), from, to: observed.name, maxChars }].slice(-8);
+        log(`Chronicle: context profile ${from} -> ${observed.name} (${maxChars} chars)`);
+        journal("profile", { why: `${from}>${observed.name}` });
+        return observed;
+    };
+    // ==================== MODULE L - COMPLIANCE MONITOR ====================
+    /**
+     * Whether the model can actually answer the questions Chronicle asks
+     *
+     * The parenthetical grammar is only as good as the model's willingness to emit it, and
+     * Dynamic DeepSeek rotates between three models on every action, so willingness is not
+     * a fixed property of an adventure. This measures it instead of assuming it
+     */
+    const COMPLIANCE_BANDS = Object.freeze([
+        { name: "healthy", floor: 0.8 },
+        { name: "degraded", floor: 0.4 },
+        { name: "minimal", floor: -1 }
+    ]);
+    /** Samples kept, and the run of good samples needed to climb one band */
+    const COMPLIANCE_WINDOW = 40;
+    const COMPLIANCE_RECOVERY = 20;
+    /** Fewer samples than this and the band stays where it is */
+    const COMPLIANCE_MINIMUM = 6;
+    /**
+     * Records how a task turn went
+     * @param {number} score - 1 answered cleanly, 0.5 recovered from malformed, 0 no answer
+     * @returns {void}
+     */
+    const recordCompliance = (score = 0) => {
+        const compliance = CH.compliance;
+        const turn = getActionCount();
+        if (!Array.isArray(compliance.window)) {
+            compliance.window = [];
+        }
+        const last = compliance.window[compliance.window.length - 1];
+        if (last && (last.t === turn)) {
+            // A retried turn replaces its own sample rather than adding another
+            last.r = score;
+        } else {
+            compliance.window.push({ t: turn, r: score });
+        }
+        if (compliance.window.length > COMPLIANCE_WINDOW) {
+            compliance.window.splice(0, compliance.window.length - COMPLIANCE_WINDOW);
+        }
+        return;
+    };
+    /**
+     * The share of recent tasks the model answered
+     * @returns {number} 0 to 1, or 1 when there is not enough evidence yet
+     */
+    const complianceRate = () => {
+        const window = Array.isArray(CH.compliance.window) ? CH.compliance.window : [];
+        if (window.length < COMPLIANCE_MINIMUM) {
+            return 1;
+        }
+        return window.reduce((total, sample) => (total + (Number(sample.r) || 0)), 0) / window.length;
+    };
+    /**
+     * Settles the compliance band
+     * Falling is immediate, because continuing to ask a model that cannot answer wastes
+     * every turn. Climbing takes a run of good answers, one band at a time
+     * @param {Object} config - Validated config
+     * @returns {string} The band in force
+     */
+    const settleBand = (config = {}) => {
+        const compliance = CH.compliance;
+        if (config.compliance !== true) {
+            return "healthy";
+        }
+        const rate = complianceRate();
+        const observed = COMPLIANCE_BANDS.find(band => (rate >= band.floor)).name;
+        const current = compliance.band || "healthy";
+        const rank = (name) => COMPLIANCE_BANDS.findIndex(band => (band.name === name));
+        if (rank(observed) > rank(current)) {
+            // Worse than where we are: drop immediately, and all the way
+            compliance.band = observed;
+            compliance.streak = 0;
+            compliance.since = getActionCount();
+            // The worst band this adventure has seen, which is what a test or a player
+            // wants to know after the fact
+            if (rank(observed) > rank(compliance.lowest || "healthy")) {
+                compliance.lowest = observed;
+            }
+            if (observed === "minimal") {
+                compliance.cooldownUntil = getActionCount() + config.cooldown;
+                if (compliance.told !== true) {
+                    compliance.told = true;
+                    state.message = "Chronicle has stopped asking this model to record thoughts: it answered too few of them. It will try again shortly. The world and existing memories are still being kept.";
+                }
+            }
+            log(`Chronicle: compliance ${current} -> ${observed} (${Math.round(rate * 100)}%)`);
+            journal("band", { why: `${current}>${observed}` });
+            return observed;
+        }
+        if (rank(observed) < rank(current)) {
+            // Better than where we are: climb one band, and only after a real run
+            compliance.streak = (compliance.streak || 0) + 1;
+            if (compliance.streak >= COMPLIANCE_RECOVERY) {
+                compliance.band = COMPLIANCE_BANDS[Math.max(0, rank(current) - 1)].name;
+                compliance.streak = 0;
+                compliance.told = false;
+                log(`Chronicle: compliance ${current} -> ${compliance.band} (${Math.round(rate * 100)}%)`);
+                journal("band", { why: `${current}>${compliance.band}` });
+            }
+            return compliance.band;
+        }
+        // Neither better nor worse. A rate sitting just above a threshold will dip below it
+        // now and then as the window rolls; decaying rather than resetting means those dips
+        // slow recovery instead of preventing it forever
+        compliance.streak = Math.max(0, (compliance.streak || 0) - 1);
+        return current;
+    };
+    /**
+     * Is Chronicle allowed to ask this model for anything this turn?
+     * @param {Object} config - Validated config
+     * @returns {boolean}
+     */
+    const mayIssueTask = (config = {}) => {
+        if (config.compliance !== true) {
+            return true;
+        }
+        if (CH.compliance.band !== "minimal") {
+            return true;
+        }
+        // In the minimal band the world and existing brains still go in, read only
+        return (CH.compliance.cooldownUntil <= getActionCount());
+    };
+    // ==================== MODULE M - INJECTION CANARY ====================
+    /**
+     * Whether context injections are reaching the model at all
+     *
+     * With Optimized Context enabled, the context hook may be read-only: everything
+     * Chronicle writes is silently discarded, and every symptom looks exactly like a model
+     * that will not follow instructions. The two are told apart by asking for something so
+     * trivial that any model would comply if it saw it: begin the reply with (ok).
+     *
+     * A context modifier cannot observe its own return value, so this is the only honest
+     * test available. Three misses in a row and Chronicle stops trusting the channel
+     */
+    const CANARY_INTERVAL = 12;
+    const CANARY_MISSES_TO_FAIL = 3;
+    const CANARY_MARK = "(ok)";
+    /**
+     * Should this turn carry a canary?
+     * @param {Object} config - Validated config
+     * @returns {boolean}
+     */
+    const canaryDue = (config = {}) => {
+        if (config.canary !== true) {
+            return false;
+        }
+        const canary = CH.canary;
+        if (canary.state === "landing") {
+            // Proven once. Re-check occasionally, in case the player flips the toggle
+            return ((getActionCount() - (canary.lastTurn || 0)) >= (CANARY_INTERVAL * 8));
+        }
+        return ((getActionCount() - (canary.lastTurn || 0)) >= CANARY_INTERVAL);
+    };
+    /** The canary instruction, kept as short as anything in this file */
+    const canaryPrompt = () => `<SYSTEM>\n# Begin your reply with exactly ${CANARY_MARK} and then continue the story normally.\n</SYSTEM>`;
+    /**
+     * Records the result of a canary turn
+     * @param {boolean} seen - Did the reply carry the mark?
+     * @returns {void}
+     */
+    const recordCanary = (seen = false) => {
+        const canary = CH.canary;
+        canary.lastTurn = getActionCount();
+        if (seen) {
+            canary.hits = (canary.hits || 0) + 1;
+            canary.misses = 0;
+            if (canary.state !== "landing") {
+                canary.state = "landing";
+                log("Chronicle: context injections confirmed landing");
+                journal("canary", { why: "landing" });
+            }
+            return;
+        }
+        canary.misses = (canary.misses || 0) + 1;
+        if ((canary.misses >= CANARY_MISSES_TO_FAIL) && (canary.state !== "blocked")) {
+            canary.state = "blocked";
+            log("Chronicle: context injections are not reaching the model, falling back to memory");
+            journal("canary", { why: "blocked" });
+            if (canary.told !== true) {
+                canary.told = true;
+                state.message = "Chronicle's context injections are not reaching this model. This is what the Optimized Context setting does. Chronicle has fallen back to the memory channel, which carries the world but not the full simulation. Turning Optimized Context off restores it.";
+            }
+        }
+        return;
+    };
+    /**
+     * The fallback channel, used when the context hook's work is being discarded
+     *
+     * frontMemory sits directly in front of the model's continuation and authorsNote rides
+     * along with it, so between them the world survives even when the context hook does not.
+     * Written from onInput, which takes effect on the turn being generated
+     * @param {Object} config - Validated config
+     * @returns {void}
+     */
+    const writeFallbackChannel = (config = {}) => {
+        if (!globalThis.state) {
+            return;
+        }
+        state.memory = (state.memory && (typeof state.memory === "object")) ? state.memory : {};
+        if (CH.canary.state !== "blocked") {
+            // Only clear what this module wrote, never the player's own memory
+            if (typeof state.memory.frontMemory === "string" && state.memory.frontMemory.startsWith("[Chronicle]")) {
+                state.memory.frontMemory = "";
+            }
+            if (typeof state.memory.authorsNote === "string" && state.memory.authorsNote.startsWith("[Chronicle]")) {
+                state.memory.authorsNote = "";
+            }
+            return;
+        }
+        // Everything that has to survive the narrower channel, in priority order
+        const budget = Math.max(200, Math.min(600, Math.floor((CH.budget.maxChars || 8000) * 0.04)));
+        const lines = [];
+        if (config.world === true) {
+            const world = CH.world;
+            lines.push([
+                `Date ${world.date}`,
+                world.place ? `at ${world.place}` : "",
+                world.arc ? `arc: ${world.arc}` : "",
+                (world.threats.length ? `threats: ${world.threats.slice(0, 2).join(", ")}` : "")
+            ].filter(part => (part !== "")).join("; "));
+        }
+        if ((config.bonds === true) && (IS.agent !== "") && (IS.agent !== " ")) {
+            lines.push(`${IS.agent} stands at "${BOND_STAGES[bondOf(IS.agent).stage]}" with ${config.player}`);
+        }
+        const rendered = `[Chronicle] ${lines.filter(line => (line !== "")).join(" | ")}`.slice(0, budget);
+        state.memory.frontMemory = (lines.length === 0) ? "" : rendered;
+        return;
+    };
+    // ==================== MODULE N - LEAN EMISSION ====================
+    /**
+     * Terse prompts, for when the context is small or the model is struggling
+     *
+     * DeepSeek and GLM both follow one short instruction better than fifteen long ones, and
+     * a small-context turn spent on politeness is a turn the story does not get
+     * @param {string} kind - "assign", "choice", "forget", "audit" or "compress"
+     * @param {Object} parts - { agent, player, pov, pair }
+     * @returns {string}
+     */
+    const leanPrompt = (kind = "assign", parts = {}) => {
+        const who = parts.agent || "the character";
+        const grammar = {
+            assign: `(key_name = \`One short first person thought.\`)`,
+            choice: `(key_name = \`One short first person thought.\`) or (new_key = old_key) or (delete old_key)`,
+            forget: `(delete key_name)`,
+            audit: `(audit = \`One sentence, or: No contradictions found.\`)`,
+            compress: `(compress = \`One sentence merging both.\`)`
+        }[kind] || `(key_name = \`One short first person thought.\`)`;
+        const instruction = {
+            assign: `Begin with one ${who} thought in this exact form, then a space, then the story:`,
+            choice: `Begin with exactly one of these forms, then a space, then the story:`,
+            forget: `${who}'s memory is full. Begin with this exact form naming an existing key, then a space, then the story:`,
+            audit: `Compare the scene against the facts above. Begin with this exact form, then a space, then the story:`,
+            compress: `Merge these two ${who} memories into one. Begin with this exact form, then a space, then the story:`
+        }[kind] || `Begin with this exact form, then a space, then the story:`;
+        return `<SYSTEM>\n# ${instruction}\n${grammar}${(
+            (kind === "compress") ? `\n1. ${(parts.pair || [])[0] ?? ""}\n2. ${(parts.pair || [])[1] ?? ""}` : ""
+        )}\n</SYSTEM>`;
+    };
+    /**
+     * The one-line operating environment, replacing the fifteen line version
+     * @param {Object} parts - { agent, player, pov }
+     * @returns {string}
+     */
+    const leanDirective = (parts = {}) => (
+        `<SYSTEM>\n# ${parts.agent} is a character in this story with a mind of their own, written from ${parts.player}'s ${parts.pov} person perspective.\n</SYSTEM>`
+    );
+    // ==================== RUNTIME ====================
+    /**
+     * The effective settings for this turn: the player's config, clamped by the context the
+     * model actually has and by how well it has been answering
+     *
+     * Returns the config untouched when modules K, L and N are all off, which is what keeps
+     * a default install byte-identical to Inner Self
+     * @param {Object} config - Validated config
+     * @returns {Object} Effective config, plus profile, band and lean
+     */
+    const runtimeFor = (config = {}) => {
+        const runtime = {
+            ...config,
+            profile: "",
+            band: "healthy",
+            lean: false,
+            digests: 99,
+            witness: 99,
+            clockLines: 99,
+            bondNote: true,
+            injectCap: Infinity,
+            landing: (config.canary === true) ? CH.canary.state : "landing"
+        };
+        if (config.autoscale === true) {
+            const maxChars = Number.isInteger(info.maxChars) ? info.maxChars : 0;
+            const profile = settleProfile(maxChars);
+            runtime.profile = profile.name;
+            // A profile only ever takes away. The player's own settings stay the ceiling
+            runtime.worldChars = Math.min(config.worldChars, profile.chronicle);
+            runtime.brains = Math.min(config.brains, profile.brains);
+            runtime.digests = profile.digests;
+            runtime.witness = profile.witness;
+            runtime.clockLines = profile.clockLines;
+            runtime.auditEvery = (profile.audit === 0) ? 0 : Math.max(config.auditEvery, profile.audit);
+            runtime.audit = (config.audit === true) && (profile.audit !== 0);
+            runtime.injectCap = Math.floor((maxChars || 0) * (profile.injectPercent / 100)) || Infinity;
+            runtime.lean = (config.lean === true) && ["XS", "S"].includes(profile.name);
+        }
+        if (config.compliance === true) {
+            runtime.band = settleBand(config);
+            if (runtime.band !== "healthy") {
+                // Degraded and minimal both stop the extras competing for the model's
+                // attention, in the order laid down by DEGRADE_ORDER
+                runtime.lean = (config.lean === true) || runtime.lean;
+                runtime.audit = false;
+                runtime.witness = 0;
+                runtime.digests = Math.min(runtime.digests, 1);
+                runtime.brains = 1;
+            }
+        }
+        return runtime;
+    };
+    /**
+     * Applies the ordered degradation until the turn's injections fit the budget
+     * Chronicle and core thoughts are last, and never reach zero
+     * @param {Object} runtime - Effective settings, mutated in place
+     * @param {number} projected - Characters this turn wants to inject
+     * @returns {Object} The runtime, degraded as far as it needed to be
+     */
+    const degradeStep = (runtime = {}, index = 0) => {
+        const feature = DEGRADE_ORDER[index];
+        if (feature === "audit") {
+            runtime.audit = false;
+        } else if (feature === "witness") {
+            runtime.witness = 0;
+        } else if (feature === "digests") {
+            runtime.digests = 0;
+        } else if (feature === "brains") {
+            runtime.brains = 1;
+        } else if (feature === "bondNote") {
+            runtime.bondNote = false;
+        } else if (feature === "clockLines") {
+            runtime.clockLines = 1;
+        } else if (feature === "chronicle") {
+            // The floor, never zero: a world nobody can see is not a world
+            runtime.worldChars = Math.max(180, Math.min(runtime.worldChars, Math.floor(runtime.injectCap * 0.5)));
+        }
+        runtime.degraded = feature;
+        return runtime;
+    };
+    // ==================== CONTEXT OVERLAY ====================
+    /**
+     * Everything the modules want to say, rendered above the brain block
+     *
+     * Returns an empty string when every module is off, which is what keeps a default
+     * install byte-identical to Inner Self
+     * @param {Object} config - Validated config
+     * @param {Object[]} present - Present agents, most recent first
+     * @returns {string}
+     */
+    const buildOverlay = (config = {}, present = [], primary = "") => {
+        const parts = [];
+        if ((config.bonds === true) && (config.bondNote !== false) && (primary !== "")) {
+            // Module I tells the model how to record a change in standing, in the grammar
+            // the thought parser already reads. There is no second parser
+            const bond = bondOf(primary);
+            const waited = (getActionCount() - bond.turn);
+            if (config.lean === true) {
+                // One line, because a small context turn spent on ceremony is a turn the
+                // story does not get
+                parts.push(`<SYSTEM>\n# ${primary} stands at "${BOND_STAGES[bond.stage]}" with ${config.player}.${(
+                    (waited < config.bondTurns) ? "" : ` Write (bond = \`${BOND_STAGES[Math.min(bond.stage + 1, BOND_STAGES.length - 1)]}\`) only if this scene earned it.`
+                )}\n</SYSTEM>\n\n`);
+            } else {
+            parts.push(`<SYSTEM>\n# ${primary} currently stands at "${BOND_STAGES[bond.stage]}" with ${config.player}.\n# ${(
+                (waited < config.bondTurns)
+                ? `That standing is settled for now and must not change.`
+                : `If, and only if, this scene has genuinely earned it, ${primary} may record the next rung by writing (bond = \`${BOND_STAGES[Math.min(bond.stage + 1, BOND_STAGES.length - 1)]}\`) in place of a thought.`
+            )}\n# The ladder never skips upward: ${BOND_STAGES.join(", ")}.\n# A betrayal may drop ${primary} several rungs at once, written the same way.\n</SYSTEM>\n\n`);
+            }
+        }
+        if (config.world === true) {
+            const extra = [];
+            if (config.clocks === true) {
+                for (const [name, clock] of Object.entries(readClocks())) {
+                    if (0 < clock.value) {
+                        extra.push(`Clock ${name.replace(/_/g, " ")}: ${clock.value}/${clock.max}${clock.locked ? " (spent)" : ""}`);
+                    }
+                }
+            }
+            parts.push(renderWorld(config.worldChars, extra.slice(0, config.clockLines ?? 99), config.lean === true));
+        }
+        if (config.clocks === true) {
+            const due = dueConsequences();
+            if (0 < due.length) {
+                // A consequence that fired is an instruction, not a hint
+                parts.push(`<SYSTEM>\n# Bring this to the surface now, in this scene:\n${(
+                    due.map(item => `- ${item.payload}`).join("\n")
+                )}\n</SYSTEM>\n\n`);
+                CH.fire = { turn: getActionCount(), ids: due.map(item => item.id) };
+            }
+        }
+        if ((config.knows === true) && (0 < present.length)) {
+            const lines = [];
+            for (const { name } of present.slice(0, config.brains)) {
+                lines.push(...blindSpots(name, 240));
+            }
+            lines.splice(Number.isInteger(config.witness) ? config.witness : lines.length);
+            if (0 < lines.length) {
+                parts.push(`# What the people here do not know: [\n${lines.map(line => `- ${line}`).join("\n")}\n]\n\n`);
+            }
+        }
+        if ((config.ensemble === true) && (config.brains < present.length) && (config.digests !== 0)) {
+            // Everyone present but crowded out of a full brain still gets a line, so they
+            // are people in the scene rather than furniture
+            const digests = [];
+            const room = Number.isInteger(config.digests) ? config.digests : 4;
+            for (const { name } of present.slice(config.brains, config.brains + Math.min(room, 4))) {
+                const other = new Agent(name, { percent: config.percent });
+                const brain = other.brain;
+                let best = null;
+                let bestLabel = -1;
+                for (const key of Object.keys(brain)) {
+                    const value = String(brain[key]);
+                    const arrow = value.indexOf("→");
+                    const label = (arrow === -1) ? 0 : (parseInt(value.slice(0, arrow), 10) || 0);
+                    if (bestLabel < label) {
+                        bestLabel = label;
+                        best = value.slice(arrow + 1).trim();
+                    }
+                }
+                other.lobotomize();
+                if (best) {
+                    digests.push(`- ${name}: ${best}`);
+                }
+            }
+            if (0 < digests.length) {
+                parts.push(`# Also here, and thinking their own thoughts: [\n${digests.join("\n")}\n]\n\n`);
+            }
+        }
+        return parts.join("");
+    };
+    /**
+     * Full brains for the other characters in the scene
+     *
+     * The context budget is split between everyone present rather than handed to one of
+     * them, so a three character scene reads as three people instead of one person and two
+     * pieces of furniture
+     * @param {Object} config - Validated config
+     * @param {Object[]} present - Present agents, most recent first
+     * @param {string} primary - The agent who will actually write this turn
+     * @param {Set} whitelist - Labels allowed to decode, extended in place
+     * @returns {string}
+     */
+    const ensembleBlocks = (config = {}, present = [], primary = "", whitelist = new Set(), storyChars = 4000) => {
+        if (config.ensemble !== true) {
+            return "";
+        }
+        const others = present.filter(entry => (entry.name !== primary)).slice(0, Math.max(0, config.brains - 1));
+        const blocks = [];
+        for (const { name } of others) {
+            const other = new Agent(name, { percent: config.percent });
+            const brain = other.brain;
+            const thoughts = [];
+            for (const key of Object.keys(brain)) {
+                const value = String(brain[key]);
+                const arrow = value.indexOf("→");
+                const label = (arrow === -1) ? null : parseInt(value.slice(0, arrow), 10);
+                if (Number.isInteger(label)) {
+                    whitelist.add(label);
+                }
+                thoughts.push((config.lean === true)
+                    ? `${Number.isInteger(label) ? `[${label}] ` : ""}${bareKey(key)}: ${value.slice(arrow + 1).trim()}`
+                    : `${Number.isInteger(label) ? `[${label}] ` : ""}(${bareKey(key)}: \`${value.slice(arrow + 1).trim()}\`)`);
+            }
+            other.lobotomize();
+            if (thoughts.length === 0) {
+                // Present, but has never had a thought yet. Saying so keeps them a person
+                // in the scene rather than scenery the narrator may quietly forget
+                blocks.push(`# ${name}${name.toLowerCase().endsWith("s") ? "'" : "'s"} brain and inner self: [\n- ${name} is here, and has not formed any thoughts yet.\n]`);
+                continue;
+            }
+            // The budget is the same one a single brain would have had, divided between
+            // everybody present rather than handed to whoever spoke last
+            const share = Math.max(200, Math.floor(
+                ((config.percent / 100) * storyChars) / Math.max(1, config.brains)
+            ));
+            let block = "";
+            for (const thought of thoughts) {
+                if ((block.length + thought.length + 1) > share) {
+                    break;
+                }
+                block += `${thought}\n`;
+            }
+            if (block !== "") {
+                blocks.push((config.lean === true)
+                    ? `${name} mind:\n${block.trimEnd()}`
+                    : `# ${name}${name.toLowerCase().endsWith("s") ? "'" : "'s"} brain and inner self: [\n${block.trimEnd()}\n]`);
+            }
+        }
+        return (blocks.length === 0) ? "" : `${blocks.join("\n\n")}\n\n`;
+    };
+    // ==================== MODULE H - PLAYER CONSOLE ====================
+    /**
+     * Commands the platform itself handles
+     *
+     * Chronicle refuses to register any of these, so they pass through untouched. This list
+     * is not verifiable from inside a script, so it is deliberately wide and deliberately
+     * editable: add anything the platform claims later, and Chronicle will stand aside
+     * @type {string[]}
+     */
+    const NATIVE_COMMANDS = Object.freeze([
+        "reset", "retry", "revert", "erase", "redo", "undoall", "alter", "remember",
+        "note", "continue", "do", "say", "story", "see", "image", "settings", "quit",
+        "exit", "save", "load", "ac"
+    ]);
+    /**
+     * Handles a slash command typed by the player
+     *
+     * Console changes are applied immediately rather than staged. There is no generation to
+     * discard: the player typed this, and a retry regenerates model output, never input
+     * @param {string} command - Raw input text
+     * @param {Object} config - Validated config
+     * @returns {string|null} The reply to show, or null if this was not a command
+     */
+    const runCommand = (command = "", config = {}) => {
+        const match = String(command).trim().match(/^\/([a-z]+)\s*([\s\S]{0,200})$/i);
+        if (!match) {
+            return null;
+        }
+        const name = match[1].toLowerCase();
+        if (NATIVE_COMMANDS.includes(name)) {
+            // The platform owns this one. A player who breaks their own retry because
+            // Chronicle ate /reset will not be charmed by the explanation
+            return null;
+        }
+        const args = match[2].trim().split(/\s+/).filter(part => (part !== ""));
+        const agentNamed = (raw = "") => config.agents.find(
+            agent => (agent.toLowerCase() === String(raw).toLowerCase())
+        );
+        if (name === "help") {
+            return [
+                "Chronicle commands:",
+                "/state - the world as Chronicle sees it",
+                "/clocks - progress clocks and what is queued",
+                "/bonds - where each character stands with you",
+                "/who - who is present and how the context is split",
+                "/pin <name> <key> - protect a thought from ever being forgotten",
+                "/unpin <name> <key> - let it be forgotten again",
+                "/forget <name> <key> - delete a thought now",
+                "/undo - revert the last committed change",
+                "/date <value> - set the in-game date",
+                "/audit - run a continuity check on the next turn",
+                "/diag - state size, timings, and recent transactions"
+            ].join("\n");
+        }
+        if (name === "state") {
+            const world = CH.world;
+            return [
+                `Date: ${world.date}`,
+                `Location: ${world.place || "unrecorded"}`,
+                `Arc: ${world.arc || "unrecorded"}`,
+                `Standing: ${Object.entries(world.factions).map(([k, v]) => `${k} ${(0 <= v) ? "+" : ""}${v}`).join(", ") || "none"}`,
+                `Open debts: ${world.debts.join("; ") || "none"}`,
+                `Open threats: ${world.threats.join("; ") || "none"}`,
+                `Lost to memory: ${world.lost.join("; ") || "nothing yet"}`,
+                `Thinking characters: ${config.agents.join(", ") || "none configured"}`
+            ].join("\n");
+        }
+        if (name === "clocks") {
+            const clocks = Object.entries(readClocks());
+            const queued = CH.queue.filter(item => !item.fired);
+            return [
+                clocks.length
+                    ? clocks.map(([id, clock]) => `${id}: ${clock.value}/${clock.max}${clock.locked ? " (spent)" : ""}`).join("\n")
+                    : "No clocks defined. Edit the \"Chronicle Clocks\" card to author some.",
+                queued.length ? `\nComing: ${queued.map(item => item.payload).join("; ")}` : ""
+            ].join("\n").trim();
+        }
+        if (name === "bonds") {
+            const lines = config.agents.map(agent => {
+                const bond = bondOf(agent);
+                const waited = getActionCount() - bond.turn;
+                return `${agent}: ${BOND_STAGES[bond.stage]}${(waited < config.bondTurns) ? ` (${config.bondTurns - waited} turns until they can move closer)` : ""}`;
+            });
+            return lines.length ? lines.join("\n") : "No characters configured.";
+        }
+        if (name === "who") {
+            const present = presentAgents(config);
+            if (present.length === 0) {
+                return "Nobody is acting in the scene right now.";
+            }
+            const full = Math.min(present.length, config.ensemble ? config.brains : 1);
+            const share = Math.floor(config.percent / Math.max(1, full));
+            return present.map(({ name: who }, index) => (
+                `${who}: ${(index < full) ? `full brain, about ${share}% of the story budget` : "one line digest"}`
+            )).join("\n");
+        }
+        if ((name === "pin") || (name === "unpin") || (name === "forget")) {
+            const who = agentNamed(args[0]);
+            const key = formatKey(args.slice(1).join("_"));
+            if (!who || (key === "")) {
+                return `Usage: /${name} <character> <thought key>`;
+            }
+            const agent = new Agent(who, { percent: config.percent });
+            const brain = agent.brain;
+            const target = own(brain, key) ? key : (own(brain, `${CORE}${key}`) ? `${CORE}${key}` : null);
+            if (target === null) {
+                return `${who} has no thought called ${key}.`;
+            }
+            if (name === "forget") {
+                delete brain[target];
+                agent.card.description = serializeBrain(brain, config.json === true);
+                return `${who} has forgotten ${bareKey(target)}.`;
+            }
+            if (name === "pin") {
+                if (isCore(target)) {
+                    return `${bareKey(target)} is already pinned.`;
+                }
+                const pinned = Object.keys(brain).filter(isCore).length;
+                if (config.core <= pinned) {
+                    return `${who} already has ${pinned} pinned thoughts, which is the limit.`;
+                }
+                brain[`${CORE}${target}`] = brain[target];
+                delete brain[target];
+                agent.card.description = serializeBrain(brain, config.json === true);
+                return `${key} is pinned. ${who} will never forget it.`;
+            }
+            if (!isCore(target)) {
+                return `${key} was not pinned.`;
+            }
+            brain[bareKey(target)] = brain[target];
+            delete brain[target];
+            agent.card.description = serializeBrain(brain, config.json === true);
+            return `${key} is no longer pinned.`;
+        }
+        if (name === "undo") {
+            const undo = CH.undo;
+            if (!undo || (typeof undo.agent !== "string")) {
+                return "There is nothing to undo.";
+            }
+            const restored = [];
+            if (undo.agent !== "") {
+                const agent = new Agent(undo.agent, { percent: config.percent });
+                const card = agent.card;
+                if (!card || (typeof card !== "object")) {
+                    return "The brain card that change belongs to is gone.";
+                }
+                card.entry = undo.entry;
+                card.description = undo.description;
+                restored.push(`${undo.agent}'s mind`);
+            }
+            IS.label = Number.isInteger(undo.label) ? undo.label : IS.label;
+            IS.ops = Number.isInteger(undo.ops) ? undo.ops : IS.ops;
+            if (undo.world && (typeof undo.world === "object")) {
+                CH.world = undo.world;
+                writeWorld();
+                restored.push("the world");
+            }
+            if (undo.clocks && (typeof undo.clocks === "object")) {
+                CH.clocks = undo.clocks;
+                restored.push("the clocks");
+            }
+            if (undo.bonds && (typeof undo.bonds === "object")) {
+                CH.bonds = undo.bonds;
+                restored.push("every standing");
+            }
+            CH.undo = null;
+            journal("undo", { agent: undo.agent });
+            return `Reverted the last change to ${restored.join(", ")}.`;
+        }
+        if (name === "date") {
+            const value = args.join(" ").slice(0, 60);
+            if (value === "") {
+                return `The date is ${CH.world.date}.`;
+            }
+            CH.world.date = value;
+            writeWorld();
+            return `The date is now ${value}.`;
+        }
+        if (name === "audit") {
+            if (config.audit !== true) {
+                return "The continuity auditor is switched off in the config card.";
+            }
+            CH.audit.last = -config.auditEvery;
+            return "A continuity check will run on your next turn.";
+        }
+        if (name === "diag") {
+            const size = JSON.stringify(state).length;
+            const average = (window = []) => (
+                window.length ? `${Math.round(window.reduce((a, b) => (a + b), 0) / window.length)}ms` : "-"
+            );
+            const cost = CH.diag.cost || {};
+            return [
+                `Context: ${CH.budget.maxChars || "unread"} chars, profile ${CH.budget.profile || "not scaling"}${(
+                    (0 < (CH.budget.changes || []).length)
+                    ? ` (last change ${CH.budget.changes[CH.budget.changes.length - 1].from} to ${CH.budget.changes[CH.budget.changes.length - 1].to} at turn ${CH.budget.changes[CH.budget.changes.length - 1].turn})`
+                    : ""
+                )}`,
+                `Model compliance: ${(config.compliance === true) ? `${CH.compliance.band}, ${Math.round(complianceRate() * 100)}% of ${(CH.compliance.window || []).length} recent tasks` : "not watched"}${(
+                    ((CH.compliance.band === "minimal") && (getActionCount() < CH.compliance.cooldownUntil))
+                    ? `, asking again in ${CH.compliance.cooldownUntil - getActionCount()} turns`
+                    : ""
+                )}`,
+                `Injections landing: ${(config.canary === true) ? `${CH.canary.state} (${CH.canary.hits || 0} confirmed, ${CH.canary.misses || 0} missed in a row)` : "not checked"}`,
+                `Last turn cost: world ${cost.world || 0}, brains ${cost.brains || 0}, ensemble ${cost.ensemble || 0}, task ${cost.task || 0}, directive ${cost.directive || 0}, total ${cost.total || 0}${(
+                    cost.cap ? ` of ${cost.cap} allowed` : ""
+                )}`,
+                `State: ${size} of ${config.stateChars} chars (${Math.round((size / config.stateChars) * 100)}%)`,
+                `Hook time, recent average: input ${average(CH.diag.hooks.input)}, context ${average(CH.diag.hooks.context)}, output ${average(CH.diag.hooks.output)}`,
+                `Transactions: ${CH.stats.commits} committed, ${CH.stats.discards} discarded, ${CH.stats.refused} operations refused`,
+                `Skipped optional work: ${CH.diag.skips} times`,
+                `Card index: ${Object.keys(CH.index).length} cards, ${(() => {
+                    const hits = CH.diag.hits || 0;
+                    const total = hits + (CH.diag.misses || 0);
+                    return total ? `${Math.round((hits / total) * 100)}% hit rate` : "unused";
+                })()}`,
+                `Recent ledger: ${CH.journal.slice(-6).map(entry => `${entry.kind}@${entry.turn}`).join(", ") || "empty"}`
+            ].join("\n");
+        }
+        // Not one of ours, so it belongs to the story
+        return null;
+    };
+    /**
+     * Writes the diagnostics card
+     * @param {Object} config - Validated config
+     * @returns {void}
+     */
+    const writeDiagnostics = (config = {}) => {
+        if ((config.diag !== true) || !affordable(config, 30)) {
+            return;
+        }
+        const card = ownCard("Chronicle Diagnostics", "What Chronicle has been doing. Safe to delete; it will come back.", "");
+        if (!card) {
+            return;
+        }
+        const size = JSON.stringify(state).length;
+        card.description = [
+            `state: ${size} / ${config.stateChars} chars`,
+            `commits: ${CH.stats.commits}   discards: ${CH.stats.discards}   refused: ${CH.stats.refused}`,
+            `skipped optional work: ${CH.diag.skips}`,
+            "",
+            "last transactions:",
+            ...CH.journal.slice(-20).map(entry => `  turn ${entry.turn}  ${entry.kind}${(
+                entry.agent ? ` ${entry.agent}` : ""
+            )}${Number.isInteger(entry.ops) ? ` (${entry.ops} ops)` : ""}${entry.why ? ` - ${entry.why}` : ""}${entry.key ? ` ${entry.key}` : ""}`)
+        ].join("\n");
+        return;
+    };
     // ==================== CONTEXT HOOK ====================
-    // This is where (half) of the magic happens: Inner Self injects brains and tasks into context
+    // This is where (half) of the magic happens: Chronicle injects brains and tasks into context
     // Infer the current lifecycle hook
     if ((hook === "context") || Number.isInteger(info.maxChars)) {
+        // Settle the ledger before anything reads a brain
+        // This hook is the fallback commit site for continue turns that skip onInput,
+        // and the discard site for a retry, whose context hook runs while onInput does not
+        settlePending();
         // Calculate the player's context limit with a small buffer
         const limit = Math.max((Math.min(text.length, info.maxChars) - 10), 4500);
         // Ensure stop variable exists (the AID script sandbox is silly)
@@ -1064,6 +4237,26 @@ function InnerSelf(hook) {
         IS.agent = "";
         /** @type {config} */
         const config = Config.get();
+        if (CH.console.stop === true) {
+            // Module H: the player typed a command, so there is nothing to generate
+            // This is the only place a hook can stop a turn, because the input shim has
+            // nowhere to return a stop flag to
+            CH.console.stop = false;
+            IS.agent = "";
+            IS.encoding = "";
+            globalThis.stop = true;
+            recordTiming("context");
+            text ||= " ";
+            return;
+        }
+        if (config.world === true) {
+            // Module C: the card is authoritative, so read it before anything is rendered
+            readWorld(config.startDate);
+        }
+        // Modules K and L: what the model can hold this turn, and how well it has been
+        // answering. info.maxChars is read here and nowhere else, every turn, never cached,
+        // because on GLM the credit extension is charged per action and this genuinely moves
+        const R = runtimeFor(config);
         if (config.pin) {
             // Move config card to top of list if pinning is enabled
             const index = storyCards.indexOf(config.card);
@@ -1084,6 +4277,8 @@ function InnerSelf(hook) {
                         "Inner",
                         "Self",
                         "Configure Inner Self",
+                        "Chronicle",
+                        "Configure Chronicle",
                         "Agent",
                         ...api.getBannedTitles(),
                     ]);
@@ -1131,14 +4326,14 @@ function InnerSelf(hook) {
             }
         }
         if (!config.allow) {
-            // Early exit if Inner Self is disabled
+            // Early exit if Chronicle is disabled
             IS.encoding = "";
             text ||= " ";
             return;
         }
         /**
          * Removes visual indicators from all story cards
-         * Called when no agent is triggered or Inner Self is disabled
+         * Called when no agent is triggered or Chronicle is disabled
          * @returns {void}
          */
         const deindicateAll = () => {
@@ -1228,6 +4423,21 @@ function InnerSelf(hook) {
                 }
             }
         }
+        // Module D: who is actually in the scene, as opposed to merely named in it
+        const present = (config.ensemble === true) ? presentAgents(config) : [];
+        if (0 < present.length) {
+            // Writing stays one character per turn, rotated round-robin and weighted toward
+            // whoever spoke last. Concurrent writers would race for the same card
+            const weights = present.map((entry, index) => (present.length - index));
+            const total = weights.reduce((a, b) => (a + b), 0);
+            for (let [i, r] = [0, Math.random() * total]; i < present.length; i++) {
+                r -= weights[i];
+                if (r < 0) {
+                    IS.agent = present[i].name;
+                    break;
+                }
+            }
+        }
         // Temporary markers used to reliably identify sections of the context for later calculations
         const boundary = Object.freeze({
             // Hardcoded AID context header
@@ -1284,6 +4494,10 @@ function InnerSelf(hook) {
         const agent = new Agent(IS.agent, { percent: config.percent, indicator: config.indicator });
         // Whitelist of thought labels allowed in this context
         const whitelist = new Set();
+        // Module B: label -> the brain key that label belongs to
+        const labelOwner = new Map();
+        // Module B: keys whose labels surfaced in the story text this turn
+        const referenced = new Set();
         /**
          * Builds the mind array from the agent's brain
          * Sorts thoughts and prepares them for context injection
@@ -1302,6 +4516,11 @@ function InnerSelf(hook) {
                 const value = brain[key];
                 // Clear from brain (keep instantaneous memory use low)
                 delete brain[key];
+                if ((config.bonds === true) && (key === BOND_STORE)) {
+                    // Module I states the standing as a fact of its own further down, and
+                    // saying it twice would only invite the model to argue with itself
+                    continue;
+                }
                 // Arrow separates label from thought content
                 const sliceIndex = value.indexOf("→");
                 const unknown = "*";
@@ -1310,7 +4529,9 @@ function InnerSelf(hook) {
                     parseInt(value.slice(0, sliceIndex), 10) || unknown,
                     value.slice(sliceIndex + 1).trim()
                 ];
-                const triplet = [label, key, thought];
+                // Module B: the tier marker is Chronicle's bookkeeping, not a thought, so
+                // the model is shown the bare name and can never address a pin directly
+                const triplet = [label, (config.tiers === true) ? bareKey(key) : key, thought];
                 if (!Number.isInteger(label)) {
                     // No valid label, insert at random position in unknowns
                     unknowns.splice(Math.floor(Math.random() * (unknowns.length + 1)), 0, triplet);
@@ -1318,6 +4539,9 @@ function InnerSelf(hook) {
                 }
                 // Track valid labels for the whitelist
                 whitelist.add(label);
+                // Module B: remember which thought a label belongs to, so that a label
+                // surfacing in the story can be counted as that thought mattering
+                labelOwner.set(label, key);
                 // Insert in sorted order (ascending or descending)
                 let i = numbered.length;
                 while (i-- && ((direction * label) < (direction * numbered[i][0])));
@@ -1357,12 +4581,21 @@ function InnerSelf(hook) {
                     if (whitelist.has(n)) {
                         // This thought label is visible to the story model in context
                         decoded += `[${n}]`;
+                        if (labelOwner.has(n)) {
+                            // Module B: evidence that this thought is load-bearing
+                            referenced.add(labelOwner.get(n));
+                        }
                     }
                     n = 0;
                 }
             }
             return (decoded === "") ? "" : `${decoded}\n\n`;
         }).replace(/[\u200B-\u200D]+/g, "");
+        if ((config.tiers === true) && (0 < referenced.size)) {
+            // Module B: a thought that keeps surfacing in the story earns its way out of
+            // the working tier, where eviction can reach it
+            touchThoughts(agent.name, [...referenced]);
+        }
         /**
          * Generates possessive form of a name
          * Handles names ending in s or already possessive
@@ -1390,18 +4623,76 @@ function InnerSelf(hook) {
          * @returns {string} Formatted brain context block
          */
         const bindSelf = (joined = "") => ((mind.length = 0) || (joined === "")) ? "\n\n" : (
-            `\n\n# ${ownership(agent.name)} brain and inner self: [\n${joined}\n]\n\n`
+            (R.lean === true)
+            ? `\n\n${ownership(agent.name)} mind:\n${joined}${(
+                (config.bonds === true)
+                ? `\n- Standing with ${config.player}: ${BOND_STAGES[bondOf(agent.name).stage]}`
+                : ""
+            )}\n\n`
+            : `\n\n# ${ownership(agent.name)} brain and inner self: [\n${joined}${(
+                // Module I: where this character stands with the player, stated as a fact
+                // inside their own head rather than as an instruction from outside it
+                (config.bonds === true)
+                ? `\n- Standing with ${config.player}: ${BOND_STAGES[bondOf(agent.name).stage]}`
+                : ""
+            )}\n]\n\n`
         );
-        // Check if the current turn is a retry or erase + continue following a previous task completion
-        if (IS.hash === historyHash()) {
-            // Same history, just inject the contextualized brain without a new task
-            text = `${nondirective()}${bindSelf(mind
-                .map(([label, key, thought]) => `- ${key}: ${thought} [${label}]`)
-                .join("\n")
-            )}${text.trim()} `;
-        } else {
+        // Inner Self compared IS.hash against historyHash() here, and on a retry it fed the
+        // model the brain with no task attached. That was the other half of the retry bug:
+        // the thought from the discarded generation had already been written, so the turn
+        // was not allowed to think again, and the brain kept a thought for prose the player
+        // had thrown away. Chronicle discarded that transaction in settlePending() above, so
+        // every generation, retried or not, is free to form its own thought.
+        {
             // Prepare for a possible task request
             IS.encoding = "";
+            /**
+             * Modules L and M both have the right to stop Chronicle asking for anything:
+             * one because the model has proved it cannot answer, the other because the
+             * question is not reaching it in the first place
+             */
+            const mayAsk = mayIssueTask(config);
+            const askingCanary = mayAsk && canaryDue(config);
+            /**
+             * Some turns have something more useful to do with the thought slot than form
+             * another thought: prove the channel works, check the story for contradictions,
+             * or merge two old memories that are crowding out everything else
+             * @type {string|null}
+             */
+            const specialTask = (() => {
+                if (!mayAsk) {
+                    return null;
+                }
+                if (askingCanary) {
+                    // Module M, and nothing else this turn: the whole point is that it is
+                    // the simplest thing any model could answer
+                    return canaryPrompt();
+                }
+                if (auditDue(R) && affordable(config, 120)) {
+                    // Module G runs on the schedule, and reports without repairing
+                    return R.lean ? leanPrompt("audit", { agent: agent.name }) : auditPrompt(config.player);
+                }
+                if ((config.tiers !== true) || !affordable(config, 120)) {
+                    return null;
+                }
+                // Module B asked for two thoughts to be merged on an earlier turn
+                const mem = memoryOf(agent.name);
+                if (mem.compress.length !== 2) {
+                    return null;
+                }
+                const pair = mem.compress.map(key => {
+                    const found = mind.find(([, shown]) => (shown === bareKey(key)));
+                    return found ? found[2] : "";
+                });
+                if (pair.some(thought => (thought === ""))) {
+                    // One of them has since been edited away, so the request is stale
+                    mem.compress = [];
+                    return null;
+                }
+                return R.lean
+                    ? leanPrompt("compress", { agent: agent.name, pair })
+                    : compressionPrompt(agent.name, pair);
+            })();
             /**
              * Build the brain context and determine if constrained
              * Being constrained means the agent's brain is too large relative to the story context
@@ -1413,9 +4704,32 @@ function InnerSelf(hook) {
                  * @returns {string} Formatted thoughts
                  */
                 const joinMind = (unlabeled = false) => mind.map(([label, key, thought]) => (
-                    `${unlabeled ? "" : `[${label}] `}(${key}: \`${thought}\`)`
+                    (R.lean === true)
+                    // Module N: bare lines, no framing, no backticks to be mismatched
+                    ? `${unlabeled ? "" : `[${label}] `}${key}: ${thought}`
+                    : `${unlabeled ? "" : `[${label}] `}(${key}: \`${thought}\`)`
                 )).join("\n");
-                const joined = joinMind();
+                const joined = (() => {
+                    const full = joinMind();
+                    if ((R.lean !== true) || !Number.isFinite(R.injectCap)) {
+                        return full;
+                    }
+                    // Module N: in a small context the brain gets a share, not the run of
+                    // the place. Lines are dropped whole, from the far end of whatever
+                    // order this turn chose, so no thought is shown half written
+                    const share = Math.max(200, Math.floor(R.injectCap * 0.55));
+                    if (full.length <= share) {
+                        return full;
+                    }
+                    let kept = "";
+                    for (const line of full.split("\n")) {
+                        if ((kept.length + line.length + 1) > share) {
+                            break;
+                        }
+                        kept += (kept === "") ? line : `\n${line}`;
+                    }
+                    return kept;
+                })();
                 // Check if brain exceeds the allowed percentage of context
                 // Only applies when brain is at least 800 chars
                 const constrained = ((800 < joined.length) && (
@@ -2017,21 +5331,86 @@ Follow the format **perfectly**.
                 // Primitives pass through
                 : t[p]
             ); } });
+            // What the modules want said, above the brain block, and empty when they are
+            // all switched off, which is what keeps a default install byte-identical
+            let overlay = buildOverlay(R, present, agent.name);
+            // Module D: the other people in the room, thinking their own thoughts
+            let ensemble = ensembleBlocks(R, present, agent.name, whitelist, Math.max(
+                800, (text.length - text.indexOf(boundary.upper)) + boundary.upper.length
+            ));
+            // Module N: one imperative line and the grammar, instead of fifteen instructions
+            // The thought task is built lazily and once, because building it consumes the
+            // same random draw Inner Self spends on its self-reflection line, and the order
+            // of those draws is what keeps a default install byte-identical
+            const directive = (R.lean === true)
+                ? leanDirective({ agent: agent.name, player: config.player, pov })
+                : prompt.directive[pov];
+            const forgetTask = (R.lean === true)
+                ? leanPrompt("forget", { agent: agent.name })
+                : prompt.forget[pov];
+            let builtTask = null;
+            const thoughtTask = () => (builtTask ??= ((R.lean === true)
+                ? leanPrompt((limit < 20000) ? "assign" : "choice", { agent: agent.name })
+                // Low context = simple prompt, high context = advanced prompt
+                : ((limit < 20000) ? prompt.assign[pov] : prompt.choice[pov])
+            ));
+            if ((config.autoscale === true) || (config.diag === true)) {
+                // Module K: if this turn's injections would overrun the share of the context
+                // Chronicle is allowed, give features up in the declared order, one at a
+                // time, re-measuring after each until it fits. Nothing is shaved evenly:
+                // losing the audit entirely beats keeping half of everything
+                const weigh = () => (
+                    directive.length + overlay.length + self.length + ensemble.length
+                    + (specialTask || (full ? forgetTask : thoughtTask())).length
+                );
+                const rebuild = () => {
+                    overlay = buildOverlay(R, present, agent.name);
+                    ensemble = ensembleBlocks(R, present, agent.name, whitelist, Math.max(
+                        800, (text.length - text.indexOf(boundary.upper)) + boundary.upper.length
+                    ));
+                };
+                for (let step = 0; (step < DEGRADE_ORDER.length) && Number.isFinite(R.injectCap) && (R.injectCap < weigh()); step++) {
+                    degradeStep(R, step);
+                    rebuild();
+                }
+                // Module J: what each part of this turn cost, for /diag
+                CH.diag.cost = {
+                    world: overlay.length,
+                    brains: self.length,
+                    ensemble: ensemble.length,
+                    task: (specialTask || (full ? forgetTask : thoughtTask())).length,
+                    directive: directive.length,
+                    total: weigh(),
+                    profile: R.profile,
+                    cap: Number.isFinite(R.injectCap) ? R.injectCap : 0
+                };
+            }
+            // Modules L and M: remember what was asked, so the answer can be judged
+            CH.compliance.asked = mayAsk ? {
+                turn: getActionCount(),
+                kind: askingCanary ? "canary" : (specialTask ? "special" : (full ? "forget" : "thought"))
+            } : null;
             // Build the final context with appropriate prompts
-            text = full ? (
+            text = specialTask ? (
+                // Module B, G or M asked for this turn's slot instead
+                `${directive}${overlay}${self}${ensemble}${text.trim()}${boundary.lower}${specialTask}\n\n`
+            ) : (!mayAsk) ? (
+                // Module L: this model cannot answer right now, so nothing is asked of it.
+                // The world and the existing brains still go in, read only
+                (IS.agent = " "),
+                `${nondirective()}${overlay}${self}${ensemble}${text.trim()} `
+            ) : full ? (
                 // Brain is full, prompt for deletion
-                `${prompt.directive[pov]}${self}${text.trim()}${boundary.lower}${prompt.forget[pov]}\n\n`
+                `${directive}${overlay}${self}${ensemble}${text.trim()}${boundary.lower}${forgetTask}\n\n`
             ) : ((config.chance / ((config.half && [
                 // config.half -> reduce task chance after Do/Say/Story actions (player is driving)
                 "do", "say", "story"
             ].includes(getPrevAction()?.type)) ? 200 : 100)) < Math.random()) ? (
                 // Sometimes do nothing and emit a side effect on IS.agent
                 (IS.agent = " "),
-                `${nondirective()}${self}${text.trim()} `
-            ) : `${prompt.directive[pov]}${self}${text.trim()}${boundary.lower}${(
-                // Low context = simple prompt, high context = advanced prompt
-                (limit < 20000) ? prompt.assign[pov] : prompt.choice[pov]
-            )}\n\n`;
+                (CH.compliance.asked = null),
+                `${nondirective()}${overlay}${self}${ensemble}${text.trim()} `
+            ) : `${directive}${overlay}${self}${ensemble}${text.trim()}${boundary.lower}${thoughtTask()}\n\n`;
         }
         // ==================== CONTEXT TRUNCATION ====================
         // Three-phase truncation to fit within AID's context limit
@@ -2092,13 +5471,41 @@ Follow the format **perfectly**.
             // (I've never seen this situation happen before, but I guard it anyway)
             text = text.slice(text.length - limit);
         }
+        // Whoever is writing this turn, recorded against the turn itself
+        // onOutput clears IS.agent as it goes, so a second call for the same generation
+        // batch would otherwise find nobody home and stage nothing
+        CH.writer = { turn: getActionCount(), name: IS.agent.trim() };
         // Replace transient boundary markers with proper formatting
         setMarker(boundary.upper, `\n\n${boundary.needle}\n`);
         setMarker(boundary.lower, "\n\n")
         text = text.trimStart() || " ";
+        writeDiagnostics(config);
+        recordTiming("context");
         return;
     } else if (hook === "input") {
         // ==================== INPUT HOOK ====================
+        // A new player action is the proof Chronicle waits for: the generation staged last
+        // turn is now part of the story, so its operations are safe to write
+        settlePending();
+        if (/^\s*\//.test(text)) {
+            // Module H: this might be a command rather than a story action
+            /** @type {config} */
+            const consoleConfig = Config.get();
+            if (consoleConfig.allow && (consoleConfig.console === true)) {
+                const reply = runCommand(text, consoleConfig);
+                if (typeof reply === "string") {
+                    // Answer the player, then stop the turn from the context hook, since
+                    // the input shim has nowhere to return a stop flag to
+                    state.message = reply;
+                    CH.console.stop = true;
+                    recordTiming("input");
+                    // Never an empty string, which the platform shows as an error
+                    text = "\u200B";
+                    return;
+                }
+            }
+            // Not one of ours, so it falls through to the story untouched
+        }
         // Check for /AC command to force-enable Auto-Cards
         if (IS.AC.enabled || !/\/\s*A\s*C/i.test(text) || !hasAutoCards()) {
             // Normal input processing
@@ -2122,6 +5529,20 @@ Follow the format **perfectly**.
         return;
     }
     // ==================== OUTPUT HOOK ====================
+    // Settle the ledger before the interpreter reads the brain, so it parses against
+    // committed contents. Belt and braces: whichever hook runs first this turn wins.
+    // Nothing already staged for this same turn is thrown away here: it may be a sibling
+    // candidate from the same generation batch, and history will decide between them
+    settlePending({ discardStale: false });
+    // Module M: was the canary answered? This is read before anything else touches the
+    // text, because every later step is entitled to rewrite it
+    const asked = (CH.compliance.asked && (typeof CH.compliance.asked === "object"))
+        ? CH.compliance.asked
+        : null;
+    if (asked && (asked.kind === "canary")) {
+        recordCanary(/^[\s\u200B-\u200D]*\(\s*ok\s*\)/i.test(text));
+        CH.compliance.asked = null;
+    }
     // Process model output and implement brain operations
     /** @type {config} */
     const config = Config.get();
@@ -2147,10 +5568,10 @@ Follow the format **perfectly**.
         // Print the detailed guide
         text = `
 >>> Guide:
-Inner Self was made by LewdLeah ❤️
+Chronicle is built on Inner Self, made by LewdLeah ❤️
 
 💡 Overview:
-Inner Self ${version} is an AI Dungeon mod that grants memory, goals, secrets, planning, and self-reflection capabilities to the characters living within your story. Simulated agents dynamically assemble their own minds to learn from experiences, form opinions, and adapt their behavior over time. Inner Self provides the AI with the tools it needs to truly embody characters, allowing them to feel more alive and nuanced over long adventures.
+Chronicle ${version} is an AI Dungeon mod that grants memory, goals, secrets, planning, and self-reflection capabilities to the characters living within your story. Simulated agents dynamically assemble their own minds to learn from experiences, form opinions, and adapt their behavior over time. Chronicle provides the AI with the tools it needs to truly embody characters, allowing them to feel more alive and nuanced over long adventures. Every change a character makes to their own mind is recorded transactionally, so retrying or erasing a response leaves no trace behind in anyone’s memory.
 
 📌 Features:
 - Compartmentalized memory and highly emergent behavior
@@ -2161,10 +5582,11 @@ Inner Self ${version} is an AI Dungeon mod that grants memory, goals, secrets, p
 - Visual indicators showing which NPC is currently thinking
 - General-purpose for diverse character archetypes and scenarios
 - Full Auto-Cards compatibility for comprehensive world-building
+- Retry-safe memory: a discarded response never rewrites the past
 - Open source and free to use in your own scenarios~ ❤️
 
 🎭 Setup:
-1. Open the "Configure Inner Self" story card
+1. Open the "Configure Chronicle" story card
 2. Write your player character's name where it asks in the entry
 3. Write non-player character names at the bottom of the notes (one per line)
 
@@ -2172,9 +5594,9 @@ Inner Self ${version} is an AI Dungeon mod that grants memory, goals, secrets, p
 - Use simple first names so NPCs trigger when mentioned
 - Set your AI response length to 200 tokens for the best results
 - Reduce "recent turns searched" if NPCs stay in-scene for too long
-- Reduce "thought formation chance" if Inner Self is too overwhelming
-- You can install or uninstall Auto-Cards from the Inner Self config card
-- Creators predefine Inner Self NPCs by naming story cards like so: @Leah
+- Reduce "thought formation chance" if Chronicle is too overwhelming
+- You can install or uninstall Auto-Cards from the Chronicle config card
+- Creators predefine Chronicle NPCs by naming story cards like so: @Leah
 - Try different story models to see how they perform
 
 🧠 Advanced:
@@ -2182,15 +5604,15 @@ Inner Self ${version} is an AI Dungeon mod that grants memory, goals, secrets, p
 - Entry = operation log showing a timeline of recent AI changes
 - Notes = human-readable thoughts stored as modifiable JSON in the NPC's brain
 - Neither are perfect representations of the NPC's brain (there's a lot more going on under the hood)
-- The operation log displays change over time; Inner Self allows NPCs to maintain their own thoughts in-character
+- The operation log displays change over time; Chronicle allows NPCs to maintain their own thoughts in-character
 - What seems like repetition in the operation log is often a history of useful self-maintenance on older thoughts
-- Edit the notes section of a brain card to modify that agent's mind; Inner Self will use this to build context
+- Edit the notes section of a brain card to modify that agent's mind; Chronicle will use this to build context
 - Valid JSON syntax is required in the notes section
-- Experiments are fun! I designed Inner Self to be adaptive and flexible
+- Experiments are fun! Chronicle is designed to be adaptive and flexible
 
 ⚙️ Settings:
 
-> Enable Inner Self:
+> Enable Chronicle:
 - Turns the whole system on or off
 - (true or false)
 
@@ -2212,7 +5634,7 @@ Inner Self ${version} is an AI Dungeon mod that grants memory, goals, secrets, p
 - (1% to 95%)
 
 > Recent turns searched for name triggers:
-- How far back through your previous actions Inner Self looks to decide which NPC (if any) should think
+- How far back through your previous actions Chronicle looks to decide which NPC (if any) should think
 - (1 to 250)
 
 > Visual indicator of current NPC triggers:
@@ -2242,15 +5664,61 @@ Inner Self ${version} is an AI Dungeon mod that grants memory, goals, secrets, p
 - (true or false)
 
 > Install Auto-Cards:
-- Enables automatic story card generation alongside Inner Self
+- Enables automatic story card generation alongside Chronicle
 - You can safely uninstall Auto-Cards at any time
 - (true or false)
 
-🌸 Love:
-- Please remember this is a personal passion project for me, something I do as a hobby, not as a job
-- Follow me on AI Dungeon to explore my other projects: ${u}
-- If you see me on Discord (@LewdLeah), Reddit (u/helloitsmyalt_), or anywhere else, please say hi!
-- Your kindness, patience, and love mean so much to me~ ❤️
+🧩 Modules:
+Everything below is off until you switch it on, and safe to switch off again at any time.
+
+> Tiered memory with pinned core thoughts:
+- Thoughts live in three tiers: pinned core, long-term, and working
+- A full brain evicts its coldest working thought instead of asking the AI what to burn
+- Pin anything you never want forgotten with /pin, or by putting # in front of its name
+- Characters are seeded with one pinned fact taken from their own story card
+
+> Track world state (date, place, arc, factions):
+- Keeps a "Chronicle" card holding the date, location, arc, standing, debts and threats
+- The card is authoritative: edit it and Chronicle believes you
+- The date moves when the story says it moves, never once per turn
+
+> Let several present characters think at once:
+- A three character scene reads as three people instead of one and two pieces of furniture
+- Characters who act or speak are present; characters merely mentioned are not
+- One character still writes per turn, rotated toward whoever spoke last
+
+> Track who witnessed what, and what they still believe:
+- Characters know what they were present for, and stay wrong about the rest
+- Secrets spread through the household at the rate you set, not by narrative convenience
+
+> Track progress clocks and scheduled consequences:
+- Author your own clocks on the "Chronicle Clocks" card, with the phrase that advances each
+- A full clock queues a consequence, which surfaces later, optionally once a phrase is reached
+
+> Run periodic continuity audits:
+- Now and then a turn is spent checking the scene against the world card
+- Contradictions are reported to you and logged; nothing is ever corrected behind your back
+
+> Enable player commands like /help and /undo:
+- Type /help in game for the full list
+- /state, /clocks, /bonds, /who, /pin, /unpin, /forget, /undo, /date, /audit, /diag
+
+> Track relationship bonds with the player:
+- Seven rungs, from unknown to formally bound, which cannot be skipped upward
+- A betrayal may cost several rungs at once
+- The current standing lives on the character's own card and you may edit it
+
+> Enable diagnostics and safety rails:
+- Watches the saved state size and trims the most expendable things before it overflows
+- Skips optional work rather than risk a hook timing out
+- Keeps a "Chronicle Diagnostics" card showing the last twenty transactions
+
+🌸 Credit:
+- Chronicle is a fork of ${ancestry} by LewdLeah, used and shared under the MIT licence
+- Inner Self was a personal passion project, made as a hobby and not as a job
+- Follow LewdLeah on AI Dungeon to explore the original and their other work: ${u}
+- If you see LewdLeah on Discord (@LewdLeah), Reddit (u/helloitsmyalt_), or anywhere else, please say hi!
+- Their kindness, patience, and love made all of this possible~ ❤️
 
 I hope you will have lots of fun!
 (please erase before continuing) <<<
@@ -2259,11 +5727,14 @@ I hope you will have lots of fun!
         IS.agent = "";
         return;
     } else if (!config.allow) {
-        // Early exit if Inner Self is disabled
+        // Early exit if Chronicle is disabled
         text ||= "\u200B";
         IS.agent = "";
         return;
     }
+    // Module L: whether this output had to be repaired before it could be read at all
+    // Declared here because the first repair happens before the block parser starts
+    let repaired = false;
     // Strip zero-width chars from the model output before processing
     text = text.replace(/[\u200B-\u200D]+/g, "");
     // Check if output looks like an unenclosed operation
@@ -2275,6 +5746,7 @@ I hope you will have lots of fun!
         // Fully unenclosed block resembles a known pattern
         // Add an opening parentheses so the block parser can handle it
         text = `(${text.trimStart()}`;
+        repaired = true;
     }
     // ==================== BLOCK PARSER ====================
     // Parse enclosed blocks from the output
@@ -2312,11 +5784,13 @@ I hope you will have lots of fun!
                     // Found a good insertion point
                     const index = rightIndex + match.index + match[0].length;
                     text = `${text.slice(0, index)}${close}${text.slice(index)}`;
+                    repaired = true;
                     return false;
                 }
             }
             // No boundary inferred -> Append the current close symbol to the end
             text = `${text.trimEnd()}${close}`;
+            repaired = true;
             return false;
         })();
         if (text.includes(close)) {
@@ -2398,50 +5872,32 @@ I hope you will have lots of fun!
         }
         return;
     }
-    /**
-     * Converts a key name to valid snake_case
-     * Handles various edge cases from model output
-     * @param {string} k - Raw key string
-     * @returns {string} Valid snake_case key name
-     */
-    const formatKey = (k = "") => (k
-        .trim()
-        // Take the first word only
-        .split(/\s/, 1)[0]
-        // Remove quotes and apostrophes
-        .replace(/[.'`´‘’]+/g, "")
-        // Replace non-alphanumerics with underscore
-        .replace(/[^a-z0-9A-Z_]/g, "_")
-        // Convert camelCase to snake_case
-        .replace(/([a-z0-9])([A-Z])/g, (_, a, b) => `${a}_${b.toLowerCase()}`)
-        .toLowerCase()
-        // Separate letters from numbers
-        .replace(/([a-z])([0-9])/g, (_, a, b) => `${a}_${b}`)
-        .replace(/([0-9])([a-z])/g, (_, a, b) => `${a}_${b}`)
-        // Clean up multiple underscores
-        .replace(/__+/g, "_")
-        // Remove leading/trailing underscores
-        .replace(/(?:^_|_$)/g, "")
-    );
+    // formatKey and path now live beside the transaction ledger, which needs them at commit
+    // time, one hook later than this one
     // Create an agent instance for the triggered NPC
-    const agent = (IS.agent === "") ? null : new Agent(IS.agent, { percent: config.percent });
+    // A second onOutput for the same turn falls back to the writer the context hook named,
+    // because the first call will already have cleared IS.agent
+    const writerName = (IS.agent !== "")
+        ? IS.agent
+        : ((CH.writer && (CH.writer.turn === getActionCount())) ? String(CH.writer.name || "") : "");
+    const agent = (writerName === "") ? null : new Agent(writerName, { percent: config.percent });
     // Reset IS.agent
     IS.agent = "";
     /**
-     * Generates a path string for logging operations
-     * Helps brain logs imitate actual code for ease of understanding
-     * @param {string} key - Property name to access
-     * @returns {string} Path like "agent_name.brain" or "agent_name.key"
+     * Operation descriptors staged this turn
+     * Plain data only: closures do not survive the end of a turn
+     * @type {Object[]}
      */
-    const path = (key = "brain") => `${(() => {
-        const fancy = formatKey(agent.name);
-        return (fancy === "") ? `agents[${JSON.stringify(agent.name)}]` : fancy;
-    })()}.${key}`;
-    // Queue of operations to execute
     const operations = [];
     // Track which keys have been touched this turn
     const altered = new Set();
     // ==================== BLOCK INTERPRETER ====================
+    // Module B: the model is only ever shown bare key names, so a key it writes may be
+    // addressing a pinned thought. Resolving that here is what lets an attempt to delete a
+    // pinned thought reach the ledger, where it is refused out loud rather than ignored
+    const knows = (key = "") => (
+        own(agent.brain, key) || ((config.tiers === true) && own(agent.brain, `${CORE}${key}`))
+    );
     // Process extracted block and queue appropriate operations
     interpreter: for (const block of blocks) {
         // Remove the block from the output text unless debug mode is enabled
@@ -2502,7 +5958,7 @@ I hope you will have lots of fun!
                 return null;
             }
             const delKey1 = formatKey(delMatch1[1]);
-            if (delKey1 in agent.brain) {
+            if (knows(delKey1)) {
                 // Key exists in brain
                 return delKey1;
             } else if (!/(?:key|thought|memory|unwanted)/i.test(str)) {
@@ -2515,20 +5971,11 @@ I hope you will have lots of fun!
             );
             return delMatch2 ? formatKey(delMatch2[1]) : null;
         })();
-        /**
-         * Generates a delete log statement
-         * @param {string} k - Key being deleted
-         * @returns {string} JavaScript delete statement
-         */
-        const logDelete = (k = "") => `delete ${path()}${(k === "") ? "[\"\"]" : `.${k}`};`;
-        if ((typeof delKey === "string") && (delKey in agent.brain)) {
+        if ((typeof delKey === "string") && knows(delKey)) {
             // Valid delete statement
-            if (!altered.has(delKey)) {
-                // Queue the delete operation
-                operations.push(() => {
-                    delete agent.brain[delKey];
-                    return logDelete(delKey);
-                });
+            if (!altered.has(delKey) && safeKey(delKey)) {
+                // Stage the delete operation
+                operations.push({ mod: "brain", op: "delete", agent: agent.name, key: delKey });
                 altered.add(delKey);
             }
             continue;
@@ -2550,7 +5997,7 @@ I hope you will have lots of fun!
             ).trim().replaceAll(" ", "_"));
             // If key exists in brain, use it as-is
             // Otherwise strip common prefixes/suffixes models tend to add
-            return (raw in agent.brain) ? raw : (raw
+            return knows(raw) ? raw : (raw
                 .replace(/^th(?:oughts?|ink(?:ing))_(?:(?:o[nfr]|a(?:bout|nd)|with|for)_)?/, "")
                 .replace(/(?:_(?:and|or))?_th(?:oughts?|ink(?:ing))$/, "")
             );
@@ -2559,8 +6006,11 @@ I hope you will have lots of fun!
             (60 < key.length)
             || ["thought", "thoughts", "think", "thinking", "any_name", "example_name"].includes(key)
             || ["any_key", "key_name", "example_key"].some(s => key.includes(s))
-        ) && !(key in agent.brain))) {
+        ) && !knows(key))) {
             // Skip invalid or placeholder keys copied from the task prompts
+            continue;
+        } else if (!safeKey(key)) {
+            // Reserved property names never reach a brain map, whatever the model wrote
             continue;
         }
         // ==================== VALUE EXTRACTION ====================
@@ -2574,21 +6024,51 @@ I hope you will have lots of fun!
         if (!/[a-z0-9A-Z]/.test(value) || /[\u4e00-\u9fff]/.test(value)) {
             // Skip empty or non-latin values because DeepSeek is dumb
             continue;
-        } else if (!value.includes(" ")) {
+        }
+        // ==================== RESERVED CONTROL KEYS ====================
+        // Bonds, audits and memory merges are written by the model in the very same
+        // parenthetical grammar as a thought, and are recognised here by their key. There
+        // is one parser in this file, and this is not a second one
+        if ((config.bonds === true) && (key === BOND_KEY)) {
+            operations.push({
+                mod: "bond", op: "step", npc: agent.name, delta: readBondRequest(agent.name, value)
+            });
+            continue;
+        }
+        if ((config.audit === true) && (key === "audit")) {
+            operations.push({ mod: "audit", op: "record", value: value.slice(0, 300) });
+            continue;
+        }
+        if ((config.tiers === true) && (key === "compress")) {
+            const mem = memoryOf(agent.name);
+            const summary = simplify(value.replaceAll("\u2192", " ")).trim().split("\n", 1)[0].trimEnd();
+            if ((mem.compress.length === 2) && summary.includes(" ") && (summary.length <= CAP.thought)) {
+                operations.push({
+                    mod: "brain",
+                    op: "merge",
+                    agent: agent.name,
+                    key: formatKey(bareKey(mem.compress[0])) || "merged_memory",
+                    from: [...mem.compress],
+                    value: summary,
+                    label: 0
+                });
+            }
+            // Either way the request has been answered and should not be asked again
+            mem.compress = [];
+            continue;
+        }
+        if (!value.includes(" ")) {
             // ==================== RENAME OPERATION ====================
             // No spaces = might be a key rename
             if (altered.has(key)) {
                 continue;
             }
             const oldKey = formatKey(value);
-            if (!altered.has(oldKey) && (oldKey in agent.brain)) {
+            if (!altered.has(oldKey) && knows(oldKey) && safeKey(oldKey)) {
                 // Valid rename: move thought from old key to new key
-                // Queue a rename operation
-                operations.push(() => {
-                    agent.brain[key] = agent.brain[oldKey];
-                    delete agent.brain[oldKey];
-                    const p = path();
-                    return `${p}.${key} = ${p}.${oldKey};\n${logDelete(oldKey)}`;
+                // Stage a rename operation
+                operations.push({
+                    mod: "brain", op: "rename", agent: agent.name, key, from: oldKey
                 });
                 altered.add(key);
                 altered.add(oldKey);
@@ -2604,10 +6084,10 @@ I hope you will have lots of fun!
             .replaceAll("→", " ")
             .replaceAll("\\n", "\n")
         ).trim().split("\n", 1)[0].trimEnd();
-        if (altered.has(key) || !thought.includes(" ")) {
-            // Skip if key already touched or thought too short
+        if (altered.has(key) || !thought.includes(" ") || (CAP.thought < thought.length)) {
+            // Skip if key already touched, thought too short, or thought absurdly long
             continue;
-        } else if (!(key in agent.brain)) {
+        } else if (!knows(key)) {
             // Check for duplicate thought values (don't store the same thing twice)
             const last = thought.length - 1;
             // Potentially hot loop so avoid excessive get() calls
@@ -2627,47 +6107,15 @@ I hope you will have lots of fun!
                 }
             }
         }
-        // Queue an assign operation
-        operations.push(() => {
-            // Increment the global label counter
-            IS.label++;
-            // Encode the label as zero-width chars for context tracking
-            IS.encoding = `${(IS.encoding === "") ? "\u200B" : IS.encoding}${(() => {
-                let n = IS.label;
-                let out = "";
-                // Convert label to binary using ZWNJ (0) and ZWJ (1)
-                while (0 < n) {
-                    out = `${(n & 1) ? "\u200D" : "\u200C"}${out}`;
-                    n >>>= 1;
-                }
-                return out || "\u200C";
-            })()}\u200B`;
-            // Inject the encoding into the output text
-            text = (text
-                .replace(/[\u200B-\u200D]+/g, "")
-                .replace(/^\s*/, leadingWhitespace => `${leadingWhitespace}${IS.encoding}`)
-            );
-            // One common complaint from playtesters was that models were storing repeated thoughts
-            // Upon further investigation, I discovered this was actually miscommunication on my part
-            // Players assumed the operation log (card entry) was a reflection of the brain (card notes)
-            // Thus players (reasonably) misinterpreted label updates as repetition
-            // Solution: Log distinct relabel syntax to improve non-verbal communication
-            const target = `${path()}.${key}`;
-            const old = agent.brain[key];
-            agent.brain[key] = `${IS.label} → ${thought}`;
-            // Determine if this is a relabel of the same thought value
-            const relabel = (
-                (typeof old === "string")
-                && (thought === old.slice(old.indexOf("→") + 1).trim())
-            );
-            return `${(
-                relabel ? `old = ${target};\n` : ""
-            )}${target} = ${(
-                relabel ? `[${IS.label}, old${(
-                    old.includes("→") ? "\n  .slice(old.indexOf(\"→\") + 1)\n  .trim()\n" : ".trim()"
-                )}].join(" → ")` : JSON.stringify(agent.brain[key])
-            )};`;
-        });
+        // Stage an assign operation
+        // Its label is allocated later, once the outgoing text is otherwise final, because
+        // allocating a label means weaving that label's marker into this very text
+        // One common complaint from playtesters was that models were storing repeated thoughts
+        // Upon further investigation, I discovered this was actually miscommunication on my part
+        // Players assumed the operation log (card entry) was a reflection of the brain (card notes)
+        // Thus players (reasonably) misinterpreted label updates as repetition
+        // Solution: Log distinct relabel syntax to improve non-verbal communication (see applyOp)
+        operations.push({ mod: "brain", op: "set", agent: agent.name, key, value: thought, label: 0 });
         altered.add(key);
     }
     // ==================== OUTPUT TEXT SANITIZATION ====================
@@ -2719,78 +6167,153 @@ I hope you will have lots of fun!
         // Ensure all between-action linebreaks are equally spaced
         prespace();
     }
-    // ==================== OPERATION EXECUTOR ====================
-    // Execute queued brain operations and persist changes
-    if ((operations.length === 0) || (agent === null)) {
-        // No operations to execute, we're done
+    // ==================== MODULE L - JUDGING THE ANSWER ====================
+    // A task was issued and this is what came back. Ops parsed cleanly count as compliance,
+    // ops recovered from malformed output count as half, silence counts as nothing
+    if (asked && (asked.kind !== "canary") && (config.compliance === true)) {
+        recordCompliance(
+            (operations.length === 0) ? 0 : (repaired ? 0.5 : 1)
+        );
+        CH.compliance.asked = null;
+    }
+    // ==================== MODULE SCANS ====================
+    // These read the turn's prose rather than a parenthetical: time passing, the clock
+    // triggers the player declared, and who was in the room for it
+    // Everything they find is staged, so a retried turn does not move the calendar twice
+    const actors = config.agents.filter(name => {
+        const lower = text.toLowerCase();
+        const needle = name.toLowerCase();
+        for (let p = lower.indexOf(needle); (p !== -1); p = lower.indexOf(needle, p + 1)) {
+            const before = (0 < p) ? lower.charCodeAt(p - 1) : 0;
+            const after = ((p + needle.length) < lower.length) ? lower.charCodeAt(p + needle.length) : 0;
+            if (((before < 97) || (122 < before)) && ((after < 97) || (122 < after))) {
+                return true;
+            }
+        }
+        return false;
+    });
+    if (config.world === true) {
+        const days = readTimePassage(text, config.maxDays);
+        if (0 < days) {
+            operations.push({ mod: "world", op: "advanceDays", n: days });
+        }
+    }
+    if (config.clocks === true) {
+        for (const id of triggeredClocks(readClocks(), text).slice(0, 3)) {
+            operations.push({ mod: "clock", op: "tick", id, n: 1 });
+        }
+        if (CH.fire && (CH.fire.turn === getActionCount()) && Array.isArray(CH.fire.ids)) {
+            // The directive went out in this turn's context, so the queue entry is spent
+            operations.push({ mod: "queue", op: "fire", ids: CH.fire.ids });
+            CH.fire = null;
+        }
+    }
+    if ((config.knows === true) && (0 < actors.length)) {
+        operations.push({
+            mod: "event", op: "record", actors, place: CH.world.place, tag: tagEvent(text)
+        });
+    }
+    // ==================== TRANSACTION STAGING ====================
+    // Stage the turn's operations instead of writing them
+    // Nothing below touches a story card: the ledger commits on the next turn, once the
+    // generation these operations came from has actually landed in the story
+    if (operations.length === 0) {
+        // No operations to stage, we're done
+        if (config.canary === true) {
+            writeFallbackChannel(config);
+        }
+        recordTiming("output");
         return;
     }
-    const hash = historyHash();
-    if (IS.hash === hash) {
-        // Same history hash means this turn was a retry or erase + continue
-        // This prevents duplicate brain modifications on retry (cached outputs cause problems)
-        return;
-    } else if (typeof agent.card.entry !== "string") {
-        // Initialize the brain card entry if it's not a string (shouldn't happen, but safety first)
-        agent.card.entry = "";
-    } else if (agent.card.entry.endsWith("UTC") && agent.card.entry.startsWith("// initialized @")) {
-        // This is a fresh brain card with only the timestamp comment
-        // I prefer logging this info immediately before processing the first valid operation
-        // Add metadata and initialize the brain object in the log
-        agent.card.entry = `${agent.card.entry.trimStart()}\n${path("metadata")} = ${(
-            JSON.stringify(agent.metadata, null, 2)
-        )};\n${path()} = {};\n// Entry: Displays recent brain operations to the player\n// Triggers: Configurable settings for this NPC alone\n// Notes: Allows the player to view/edit actual brain contents`;
-    }
-    // Update the hashcode to mark this history state as processed
-    IS.hash = hash;
-    // Clear the previous encoding since new operations are being committed
+    // Clear the previous encoding since new operations are being staged
     IS.encoding = "";
-    // Execute each queued operation and append to the operation log
-    for (const operation of operations) {
-        // Increment global operation counter
-        IS.ops++;
-        // Execute the operation (modifies agent.brain) and get the log message
-        // Append the message to the agent's brain card entry
-        agent.card.entry = `${agent.card.entry}\n\n// operation ${IS.ops}\n${operation()}`.trimStart();
+    // Where the label counter stood before this transaction, so a discard can rewind to it
+    const labelStart = IS.label;
+    // A model that emits a dozen blocks in one output gets the first CAP.ops of them
+    const staged = operations.slice(0, CAP.ops);
+    for (const operation of staged) {
+        if ((operation.op !== "set") && (operation.op !== "merge")) {
+            continue;
+        }
+        // Increment the global label counter
+        IS.label++;
+        operation.label = IS.label;
+        // Encode the label as zero-width chars for context tracking
+        IS.encoding = `${(IS.encoding === "") ? "\u200B" : IS.encoding}${(() => {
+            let n = IS.label;
+            let out = "";
+            // Convert label to binary using ZWNJ (0) and ZWJ (1)
+            while (0 < n) {
+                out = `${(n & 1) ? "\u200D" : "\u200C"}${out}`;
+                n >>>= 1;
+            }
+            return out || "\u200C";
+        })()}\u200B`;
+        // Inject the encoding into the output text
+        // This is the half of an operation that cannot wait for the commit, because the
+        // marker has to travel with the prose it belongs to
+        text = (text
+            .replace(/[\u200B-\u200D]+/g, "")
+            .replace(/^\s*/, leadingWhitespace => `${leadingWhitespace}${IS.encoding}`)
+        );
     }
     text ||= "\u200B";
-    // Keep the operation log from growing unbounded
-    // Limit to approximately 2000 chars to satisfy AID's soft entry limit
-    agent.card.entry = agent.card.entry.split(/\n\n/).slice(-2000).reduceRight((out, op) => (
-        // Only include operations that fit within the char limit
-        ((out.length + op.length + 2) < 2001) ? `${op}${out ? `\n\n${out}` : ""}` : out
-    ), "");
-    // ==================== BRAIN SERIALIZATION ====================
-    // Rapidly reserialize a flat representation of the modified brain, without heavy memory allocations
-    // This custom serialization is faster than JSON.stringify for flat objects
-    // It also produces a more readable format in the story card notes
-    const brain = agent.brain;
-    const keys = Object.keys(brain);
-    if (keys.length === 0) {
-        agent.card.description = "{}";
-        return;
+    // Park the transaction. A retry overwrites this record whole, it never merges into it
+    CH.pending = {
+        // The turn that produced these operations, which a later turn must move past
+        actionCount: getActionCount(),
+        // How a later turn recognizes this exact generation inside history
+        fingerprint: fingerprint(text),
+        // Where to rewind the label counter if this generation is discarded
+        labelStart,
+        // The markers embedded above, kept as a second way to recognize the generation
+        encoding: IS.encoding,
+        // Whose brain these operations belong to, empty when the world moved but nobody
+        // in it happened to be thinking
+        agent: agent ? agent.name : "",
+        // Settings captured now, so the commit needs no config card of its own
+        percent: agent ? agent.metadata.percent : config.percent,
+        json: (config.json === true),
+        // Module settings as they stood when this generation happened
+        cfg: moduleConfig(config),
+        // Module E: who was in the room, and therefore who saw what
+        actors,
+        // Everyone who could hear a rumour, for propagation at commit time
+        agents: config.agents.slice(0, 24),
+        ops: staged
+    };
+    // Inner Self stored this hash to suppress a second write on retry, and Chronicle never
+    // reads it. It is still written here so an adventure rolled back to Inner Self finds
+    // exactly the value that version would have left behind
+    // Keep every staging made for this same turn, newest last, capped
+    CH.candidates = [
+        ...(Array.isArray(CH.candidates) ? CH.candidates : []).filter(
+            candidate => (candidate && (candidate.actionCount === CH.pending.actionCount))
+        ),
+        CH.pending
+    ].slice(-CAP.candidates);
+    // Instrumentation for the open question of how many times onOutput fires per visible
+    // turn. Every entry here is one call, with the turn it claimed and what it staged
+    CH.diag.stagings = [
+        ...(Array.isArray(CH.diag.stagings) ? CH.diag.stagings : []),
+        { t: CH.pending.actionCount, h: CH.pending.fingerprint, n: staged.length }
+    ].slice(-8);
+    IS.hash = historyHash();
+    journal("stage", { ops: staged.length, agent: agent ? agent.name : "" });
+    if (config.canary === true) {
+        // Module M: memory written here takes effect from the next action, which is
+        // exactly when the fallback is needed
+        writeFallbackChannel(config);
     }
-    // Build the JSON-like string manually for each key-value pair
-    let serialized = "";
-    const appendPair = config.json ? ((
-        serialized = `"${keys[0]}": ${JSON.stringify(brain[keys[0]])}`
-    ), (key = "") => {
-        // Format -> "key": "value",\n\n (JSON with linebreaks)
-        serialized += `,\n\n"${key}": ${JSON.stringify(brain[key])}`;
-        return;
-    }) : ((
-        serialized = `${keys[0]}: ${brain[keys[0]]}`
-    ), (key = "") => {
-        // Format -> key: value\n\n (simple user-friendly format)
-        serialized += `\n\n${key}: ${brain[key]}`;
-        return;
-    });
-    for (let i = 1; i < keys.length; i++) {
-        appendPair(keys[i]);
-    }
-    agent.card.description = serialized;
+    // State is at its largest right here, with a transaction staged and not yet spent
+    enforceStateBudget(commitConfig({ cfg: moduleConfig(config) }));
+    recordTiming("output");
     return;
 }
+
+// Adventures installed before the rename call InnerSelf() from their three hook tabs
+// The alias keeps every one of those installs running without touching a single shim
+globalThis.InnerSelf ??= Chronicle;
 
 //—————————————————————————————————————————————————————————————————————————————————————
 
