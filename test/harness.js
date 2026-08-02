@@ -895,8 +895,6 @@ const MODULE_ROWS = {
     bonds: /^> Track relationship bonds with the player:/,
     bondTurns: /^> Minimum turns between bond advances:/,
     diag: /^> Enable diagnostics and safety rails:/,
-    autoscale: /^> Scale injections to the context the model has:/,
-    compliance: /^> Watch whether the model can follow the task format:/,
     cooldown: /^> Turns to stop asking after the model cannot answer:/,
     canary: /^> Check that context injections are landing at all:/,
     lean: /^> Use terse prompts when context or compliance is tight:/,
@@ -1113,7 +1111,8 @@ test("hand edits to the world card win over stored state", () => {
 suite("7. Module D — ensemble");
 
 test("characters who act are present, characters who are mentioned are not", () => {
-    const { adventure, session } = moduleAdventure({ ensemble: "true", brains: "3" });
+    // Profile L, so Module K allows three concurrent brains
+    const { adventure, session } = moduleAdventure({ ensemble: "true", brains: "3" }, { maxChars: 150000 });
     // Give all three a mind, so the only thing under test is who gets to use one
     session.play("> You spend the morning with Leah, Maren and Silas.", "do");
     for (const who of AGENTS) {
@@ -1157,16 +1156,17 @@ test("only one character writes per turn, whatever the scene", () => {
 suite("8. Module E — knowledge model");
 
 test("an absent character is told what they did not witness", () => {
-    const { adventure, session } = moduleAdventure({ knows: "true", ensemble: "true", world: "true" });
+    // Profile L, so Module K allows witness lines; at S they are the first thing dropped
+    const { adventure, session } = moduleAdventure({ knows: "true", ensemble: "true", world: "true" }, { maxChars: 150000 });
     // Leah and Maren do something Silas is not there for
     for (let i = 0; i < 4; i++) {
-        session.force(`Leah hands Maren the sealed letter. Maren hides it under the counter. Round ${i}.`);
+        session.force(`(sealed_letter = \`I watched Maren hide the letter under the counter.\`) Leah hands Maren the sealed letter. Round ${i}.`);
         session.play(`> You watch Leah and Maren, round ${i}.`, "do");
     }
     // Now a scene where Silas acts
     let sawBlindSpot = false;
     for (let i = 0; (i < 6) && !sawBlindSpot; i++) {
-        session.force(`Silas walks in alone and asks what he missed, round ${i}.`);
+        session.force(`(late_arrival = \`I walked in on something and nobody will say what.\`) Silas walks in alone, round ${i}.`);
         const step = session.play(`> You greet Silas, round ${i}.`, "do");
         if (/Silas did not witness/.test(step.contextOut[0])) {
             sawBlindSpot = true;
@@ -1246,9 +1246,11 @@ test("a full clock queues its consequence, which then surfaces exactly once", ()
 suite("10. Module G — continuity auditor");
 
 test("an audit runs on schedule and reports without correcting", () => {
-    const { adventure, session } = moduleAdventure({ audit: "true", auditEvery: "10", world: "true" });
+    // Module K sets a floor on the audit interval per profile and never lowers it, so an
+    // interval of 10 becomes 75 at profile L. The wait is the feature working
+    const { adventure, session } = moduleAdventure({ audit: "true", auditEvery: "10", world: "true" }, { maxChars: 150000 });
     let audited = false;
-    for (let i = 0; (i < 30) && !audited; i++) {
+    for (let i = 0; (i < 120) && !audited; i++) {
         const step = session.play(`> You go about the day, ${i}.`, "do");
         if (step.generation.task === "audit") {
             audited = true;
@@ -1416,7 +1418,7 @@ test("optional work is skipped rather than risking the hook timeout", () => {
     // A clock that advances a second per call makes every hook look slow
     const { adventure, session } = moduleAdventure(
         { diag: "true", timeBudget: "100", audit: "true", auditEvery: "1", tiers: "true" },
-        { clockStepMs: 1000 }
+        { clockStepMs: 1000, maxChars: 150000 }
     );
     session.play("> You keep working.", "do");
     session.play("> You keep working still.", "do");
@@ -1662,9 +1664,9 @@ function budgetRun(maxChars, { turns = 300, oscillate = null, modules = {} } = {
     // Everything on, so the injection targets are asserted under the full load rather
     // than a convenient subset of it
     const { adventure, session } = moduleAdventure({
-        autoscale: "true", lean: "true", world: "true", ensemble: "true", knows: "true",
+        lean: "true", world: "true", ensemble: "true", knows: "true",
         clocks: "true", audit: "true", tiers: "true", diag: "true", bonds: "true",
-        consoleOn: "true", compliance: "true", canary: "true", ...modules
+        consoleOn: "true", canary: "true", ...modules
     }, { maxChars });
     const card = brainCardOf(adventure, "Leah");
     if (card) {
@@ -1740,7 +1742,7 @@ test("hysteresis keeps an oscillating context from thrashing the feature set", (
 });
 
 test("maxChars is read every turn, never cached", () => {
-    const { adventure, session } = moduleAdventure({ autoscale: "true", diag: "true" }, { maxChars: 8000 });
+    const { adventure, session } = moduleAdventure({ diag: "true" }, { maxChars: 8000 });
     session.play("> You look around with Leah.", "do");
     assertEqual(adventure.state.CHRONICLE.budget.maxChars, 8000, "the first reading was wrong");
     // The player spends credits, as GLM allows, per action
@@ -1757,9 +1759,8 @@ suite("16. Module L — compliance monitor");
 
 /** Plays a session against a model that fails the format at the given rate */
 function complianceRun(sloppy, turns = 120) {
-    const { adventure, session } = moduleAdventure({
-        compliance: "true", lean: "true", cooldown: "25"
-    });
+    // Module L has no switch; only its cooldown is configurable
+    const { adventure, session } = moduleAdventure({ lean: "true", cooldown: "25" });
     session.sloppy = sloppy;
     for (const action of actionPlan(turns)) {
         session.play(action.input, action.type);
@@ -1798,14 +1799,26 @@ test("a model failing four turns in five drops to minimal and is left alone", ()
         /stopped asking/.test(String(adventure.sandbox.state.message || "")),
         `the player was not told: ${JSON.stringify(adventure.sandbox.state.message)}`
     );
+    const cooldownUntil = adventure.state.CHRONICLE.compliance.cooldownUntil;
     const quiet = [];
-    for (let i = 0; i < 10; i++) {
-        const step = session.play(`> You carry on regardless, ${i}.`, "do");
+    while (adventure.history.length < cooldownUntil) {
+        const step = session.play(`> You carry on regardless, ${quiet.length}.`, "do");
         quiet.push(taskOf(step.contextOut[0]));
     }
+    assert(0 < quiet.length, "the cooldown had already expired, so nothing was proved");
     assert(
         quiet.every(task => (task === "none")),
         `Chronicle kept asking a model that cannot answer: ${JSON.stringify(quiet)}`
+    );
+    // And it tries again afterwards rather than giving up on the adventure
+    session.sloppy = 0;
+    const resumed = [];
+    for (let i = 0; i < 8; i++) {
+        resumed.push(taskOf(session.play(`> You try once more, ${i}.`, "do").contextOut[0]));
+    }
+    assert(
+        resumed.some(task => (task !== "none")),
+        "Chronicle never asked again after the cooldown expired"
     );
     // The world and existing brains are still going in
     const step = session.play("> You look at Leah.", "do");
@@ -1920,7 +1933,7 @@ test("XS keeps total injection under 12% of the context, S under 20%", () => {
 });
 
 test("lean prompts are terse, and still answerable", () => {
-    const { adventure, session } = moduleAdventure({ autoscale: "true", lean: "true" }, { maxChars: 8000 });
+    const { adventure, session } = moduleAdventure({ lean: "true" }, { maxChars: 8000 });
     let leanSeen = false;
     let answered = 0;
     for (let i = 0; i < 40; i++) {
@@ -2011,8 +2024,7 @@ test("commands the platform owns are never swallowed", () => {
 
 test("/diag reports context, compliance, landing and per-module cost", () => {
     const { adventure, session } = moduleAdventure({
-        consoleOn: "true", autoscale: "true", compliance: "true", canary: "true",
-        world: "true", diag: "true"
+        consoleOn: "true", canary: "true", world: "true", diag: "true"
     }, { maxChars: 60000 });
     for (let i = 0; i < 6; i++) {
         session.play(`> You work with Leah, ${i}.`, "do");
@@ -2022,6 +2034,201 @@ test("/diag reports context, compliance, landing and per-module cost", () => {
     for (const expected of [/Context: \d+ chars, profile [A-Z]+/, /Model compliance: \w+/, /Injections landing: \w+/, /Last turn cost: world \d+/]) {
         assert(expected.test(report), `/diag is missing ${expected}:\n${report}`);
     }
+});
+
+// ---------------------------------------------------------------- 21. config card contract
+
+suite("21. Config card contract");
+
+/** The parser's own key function and row splitter, copied from Config.get */
+const cardKey = (s = "") => s.toLowerCase().replace(/[^a-z]+/g, "");
+const cardRows = (text = "") => Object.fromEntries(
+    String(text).split(/\s*>[\s>]*/).filter(b => b.includes(":"))
+        .map(b => b.split(/\s*:[\s:]*/, 2))
+        .map(pair => [cardKey(pair[0]), { label: pair[0].trim(), value: pair[1].trimEnd() }])
+);
+
+/** The card the generator emits from a cold start */
+function generatedCard(agents = []) {
+    const adventure = newAdventure("chronicle");
+    for (const name of agents) {
+        adventure.storyCards.push({
+            id: `seed-${name}`, keys: "", entry: "", type: "class",
+            title: `@${name}`, description: ""
+        });
+    }
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    return configCard(adventure);
+}
+
+const REFERENCE = JSON.parse(
+    fs.readFileSync(path.join(ROOT, "docs", "configure-chronicle.card.json"), "utf8")
+)[0];
+
+test("the committed reference card is exactly what the generator emits", () => {
+    // The agent list is per scenario, so it is compared separately below
+    const agents = (REFERENCE.description.match(/^[A-Za-z][A-Za-z' -]*$/gm) || [])
+        .map(line => line.trim()).filter(line => (line !== ""));
+    const fresh = generatedCard(agents);
+    assertEqual(fresh.title, REFERENCE.title, "card title drifted");
+    assertEqual(fresh.type, REFERENCE.type, "card type drifted");
+    assertEqual(fresh.keys, REFERENCE.keys, "card keys drifted");
+    assertEqual(
+        fresh.entry, REFERENCE.value,
+        "docs/configure-chronicle.card.json is stale; regenerate it from the generator"
+    );
+    // The generator walks story cards in reverse, so re-seeding from the reference list
+    // inverts the order. Trigger priority is a per-scenario choice; what must not drift is
+    // the prose and the cast
+    const marker = "trigger priority:";
+    assertEqual(
+        fresh.description.slice(0, fresh.description.indexOf(marker) + marker.length),
+        REFERENCE.description.slice(0, REFERENCE.description.indexOf(marker) + marker.length),
+        "the reference card's notes are stale; regenerate them from the generator"
+    );
+    const names = (text) => (text.slice(text.indexOf(marker)).match(/^[A-Za-z][A-Za-z' -]*$/gm) || [])
+        .map(line => line.trim()).filter(line => (line !== "")).sort();
+    assertDeep(names(fresh.description), names(REFERENCE.description), "the reference cast drifted");
+});
+
+test("every setting the generator emits is a setting the parser reads back", () => {
+    // This is the check that would have caught a hand-written card whose labels look right
+    // but simplify differently: set a distinctive value on every row, then read it back
+    const adventure = newAdventure("chronicle");
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    const card = configCard(adventure);
+    const emitted = cardRows(card.entry);
+    const settable = Object.entries(emitted).filter(([, row]) => (
+        // Prose rows have no value to set
+        /^(?:true|false|"[^"]*"|\d+%?|\d+(?:st|nd|rd)|"?[^"]*"?)$/.test(row.value) && (row.value !== "")
+    ));
+    assert(30 < settable.length, `only ${settable.length} settable rows found`);
+    // Flip every boolean and bump every integer, then check the script agrees
+    const flipped = {};
+    card.entry = card.entry.split("\n").map(line => {
+        const match = line.match(/^>\s*([^:]+):\s*(.*)$/);
+        if (!match) {
+            return line;
+        }
+        const [, label, value] = match;
+        if (value === "true") {
+            flipped[cardKey(label)] = "false";
+        } else if (value === "false") {
+            flipped[cardKey(label)] = "true";
+        } else if (/^\d+%$/.test(value)) {
+            flipped[cardKey(label)] = `${Math.max(1, parseInt(value, 10) - 1)}%`;
+        } else if (/^\d+$/.test(value)) {
+            flipped[cardKey(label)] = String(Math.max(1, parseInt(value, 10) - 1));
+        } else {
+            return line;
+        }
+        return `> ${label}: ${flipped[cardKey(label)]}`;
+    }).join("\n");
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    const after = cardRows(configCard(adventure).entry);
+    const ignored = [];
+    for (const [key, want] of Object.entries(flipped)) {
+        if (!after[key] || (after[key].value !== want)) {
+            ignored.push(`${after[key] ? after[key].label : key}: wanted ${want}, got ${after[key] ? after[key].value : "(row gone)"}`);
+        }
+    }
+    assertEqual(
+        ignored.length, 0,
+        `these rows are decorative, the parser does not read them:\n  ${ignored.join("\n  ")}`
+    );
+});
+
+test("a row whose label is reworded stops being read, and the test says so", () => {
+    // Proving the check above has teeth, using the exact mistake a hand-written card made
+    const adventure = newAdventure("chronicle");
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    const card = configCard(adventure);
+    card.entry = card.entry
+        .replace("> Tiered memory with pinned core thoughts: false", "> [B] Tiered memory with pinned core thoughts: true");
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    const after = cardRows(configCard(adventure).entry);
+    assertEqual(
+        after[cardKey("Tiered memory with pinned core thoughts")].value, "false",
+        "a prefixed label was somehow still read, which would make this test useless"
+    );
+});
+
+suite("22. Modules K and L are not optional");
+
+test("neither switch exists any more, in the panel or on the card", () => {
+    assert(
+        !chronicleSource.includes("IS_BUDGET_AUTOSCALING_ENABLED"),
+        "the budget autoscaling switch is still declared in MainSettings"
+    );
+    assert(
+        !chronicleSource.includes("IS_COMPLIANCE_MONITOR_ENABLED"),
+        "the compliance monitor switch is still declared in MainSettings"
+    );
+    const card = generatedCard();
+    assert(!/Scale injections to the context/.test(card.entry), "the autoscaling row is still emitted");
+    assert(!/Watch whether the model can follow/.test(card.entry), "the compliance row is still emitted");
+});
+
+test("both run without being asked, on a brand new adventure", () => {
+    const adventure = newAdventure("chronicle", { maxChars: 60000 });
+    seedAgents(adventure);
+    const session = new Session([adventure], { seed: 12 });
+    for (let i = 0; i < 8; i++) {
+        session.play(`> You work with Leah, ${i}.`, "do");
+    }
+    // K settled a profile from the live context, with nothing switched on
+    assertEqual(adventure.state.CHRONICLE.budget.profile, "M", "budget autoscaling did not run");
+    assertEqual(adventure.state.CHRONICLE.budget.maxChars, 60000, "maxChars was not read");
+    // L is watching
+    assert(
+        0 < (adventure.state.CHRONICLE.compliance.window || []).length,
+        "the compliance monitor recorded nothing"
+    );
+    assertEqual(adventure.state.CHRONICLE.compliance.band, "healthy", "band should start healthy");
+});
+
+test("a save carrying the old switches set to false still gets K and L", () => {
+    // The exact shape an adventure from the previous build comes back as: the rows are on
+    // the card, set to false, and the creator panel still declares them
+    const adventure = newAdventure("chronicle", { maxChars: 150000 });
+    seedAgents(adventure);
+    const session = new Session([adventure], { seed: 13 });
+    session.play("> You begin with Leah.", "do");
+    const card = configCard(adventure);
+    card.entry = `${card.entry}\n> Scale injections to the context the model has: false\n> Watch whether the model can follow the task format: false`;
+    for (let i = 0; i < 8; i++) {
+        session.play(`> You carry on with Leah, ${i}.`, "do");
+    }
+    assertEqual(adventure.throws.length, 0, "the stale rows threw");
+    assertEqual(
+        adventure.state.CHRONICLE.budget.profile, "L",
+        "a stored false disabled budget autoscaling after migration"
+    );
+    assert(
+        0 < (adventure.state.CHRONICLE.compliance.window || []).length,
+        "a stored false disabled the compliance monitor after migration"
+    );
+    // The stale rows are dropped from the card, rather than lingering as decoration
+    const rewritten = configCard(adventure).entry;
+    assert(
+        !/Scale injections to the context/.test(rewritten),
+        "the stale row survived the rewrite and now reads as a live setting"
+    );
+});
+
+test("a creator panel still declaring the old flags is harmless", () => {
+    const patched = chronicleSource.replace(
+        "    // Module L — how many turns does Chronicle stop asking after a model proves it cannot answer?",
+        "    IS_BUDGET_AUTOSCALING_ENABLED: false\n    ,\n    IS_COMPLIANCE_MONITOR_ENABLED: false\n    ,\n    // Module L — how many turns does Chronicle stop asking after a model proves it cannot answer?"
+    );
+    const adventure = new Adventure({ source: patched, entry: "Chronicle", seed: 3, maxChars: 60000 });
+    seedAgents(adventure);
+    const session = new Session([adventure], { seed: 14 });
+    for (let i = 0; i < 6; i++) {
+        session.play(`> You read on with Leah, ${i}.`, "do");
+    }
+    assertEqual(adventure.throws.length, 0, "an old creator panel threw");
+    assertEqual(adventure.state.CHRONICLE.budget.profile, "M", "an old creator panel disabled autoscaling");
 });
 
 // ---------------------------------------------------------------- report

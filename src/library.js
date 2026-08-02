@@ -166,16 +166,10 @@ globalThis.MainSettings = (class MainSettings {
     // (8000 to 200000)
     ,
 
-    // Model compatibility. Turn these on first if you play DeepSeek, Gemma or GLM:
+    // Model compatibility. Modules K and L have no switch: budget autoscaling and the
+    // compliance monitor are infrastructure, and turning either off would break the rest.
+    // These two are optional:
 
-    // Module K — should every injection budget scale to the context the model actually has?
-    IS_BUDGET_AUTOSCALING_ENABLED: false
-    // (true or false)
-    ,
-    // Module L — should Chronicle watch whether the model can follow its task format?
-    IS_COMPLIANCE_MONITOR_ENABLED: false
-    // (true or false)
-    ,
     // Module L — how many turns does Chronicle stop asking after a model proves it cannot answer?
     COMPLIANCE_COOLDOWN_TURNS: 25
     // (5 to 200)
@@ -500,14 +494,6 @@ function Chronicle(hook) {
 
     // Model compatibility. Turn these on first if you play DeepSeek, Gemma or GLM:
 
-    // Module K — should every injection budget scale to the context the model actually has?
-    IS_BUDGET_AUTOSCALING_ENABLED: false
-    // (true or false)
-    ,
-    // Module L — should Chronicle watch whether the model can follow its task format?
-    IS_COMPLIANCE_MONITOR_ENABLED: false
-    // (true or false)
-    ,
     // Module L — how many turns does Chronicle stop asking after a model proves it cannot answer?
     COMPLIANCE_COOLDOWN_TURNS: 25
     // (5 to 200)
@@ -829,9 +815,7 @@ function Chronicle(hook) {
             diag: false,
             timeBudget: 1200,
             stateChars: 40000,
-            // Modules K to N
-            autoscale: false,
-            compliance: false,
+            // Modules K to N (K and L have no switch, they always run)
             cooldown: 25,
             canary: false,
             lean: false
@@ -1073,14 +1057,8 @@ function Chronicle(hook) {
                     "stateChars", S.MAX_STATE_CHARS, { lower: 8000, upper: 200000 }
                 ) },
                 {
-                    message: "Model compatibility. Turn these on first if you play DeepSeek, Gemma or GLM, whose context can be thirty times smaller on one subscription tier than another."
+                    message: "Model compatibility. Budget autoscaling and the compliance monitor always run and have no switch here, because a fixed budget cannot meet a context that moves per action, and nothing else notices when a model stops following the operation format. The rest of this group matters most on DeepSeek, Gemma and GLM."
                 },
-                { message: "Scale injections to the context the model has:", ...factory(
-                    "autoscale", S.IS_BUDGET_AUTOSCALING_ENABLED
-                ) },
-                { message: "Watch whether the model can follow the task format:", ...factory(
-                    "compliance", S.IS_COMPLIANCE_MONITOR_ENABLED
-                ) },
                 { message: "Turns to stop asking after the model cannot answer:", ...factory(
                     "cooldown", S.COMPLIANCE_COOLDOWN_TURNS, { lower: 5, upper: 200 }
                 ) },
@@ -1097,10 +1075,19 @@ function Chronicle(hook) {
             // Description section contains info and agent list
             description: [
                 {
-                    message: "Chronicle is built on Inner Self by LewdLeah. Please visit the profile linked above and read the bio for simple steps to add it to your own scenarios! ❤️"
+                    message: `Chronicle ${version} is built on ${ancestry} by LewdLeah, used and modified under the MIT licence, with the original copyright retained in the library script. Auto-Cards is bundled unmodified. Please visit @LewdLeah on AI Dungeon through the link above; none of this exists without that work. ❤️`
                 },
                 {
-                    message: `Chronicle ${version} is an open-source AI Dungeon mod, forked from ${ancestry} by LewdLeah under the MIT licence. You have full permission to use it with any scenario!`
+                    message: "Suggested order for a long campaign. Every module in the entry above ships switched off, so turn them on in stages rather than all at once. Turns 1 to 50, add tiered memory and watch /diag. Once the compliance band holds healthy and /diag confirms injections are landing, add the world chronicle, the console, and diagnostics. Add the knowledge model and clocks around turn 100. Add ensemble last, and only at Mythic context or above, because concurrent brains are where format compliance breaks first."
+                },
+                {
+                    message: "Modules A, K and L have no switch and always run. A is the transaction ledger that makes retry safe, K scales every injection budget to your live context size, and L watches whether your model can still follow the operation grammar. Turning any of them off would break the rest."
+                },
+                {
+                    message: "Type /help in the adventure for the console, once you have enabled it. /diag shows your context profile, compliance band, and what each module is costing you per turn. /state shows the world. /undo reverts the last committed change."
+                },
+                {
+                    message: "Avoid the Atlas and Raven models entirely; they cannot receive anything this script injects. Turn Optimized Context off if your model offers it, or the world simulation is silently discarded. Tuned for DeepSeek V3.2, Dynamic DeepSeek, Gemma 31B, and GLM 5.1."
                 },
                 {
                     // This is where players list their NPCs
@@ -3537,9 +3524,6 @@ You must output one short parenthetical task followed by the story continuation.
      */
     const settleBand = (config = {}) => {
         const compliance = CH.compliance;
-        if (config.compliance !== true) {
-            return "healthy";
-        }
         const rate = complianceRate();
         const observed = COMPLIANCE_BANDS.find(band => (rate >= band.floor)).name;
         const current = compliance.band || "healthy";
@@ -3589,9 +3573,6 @@ You must output one short parenthetical task followed by the story continuation.
      * @returns {boolean}
      */
     const mayIssueTask = (config = {}) => {
-        if (config.compliance !== true) {
-            return true;
-        }
         if (CH.compliance.band !== "minimal") {
             return true;
         }
@@ -3765,7 +3746,7 @@ You must output one short parenthetical task followed by the story continuation.
             injectCap: Infinity,
             landing: (config.canary === true) ? CH.canary.state : "landing"
         };
-        if (config.autoscale === true) {
+        {
             const maxChars = Number.isInteger(info.maxChars) ? info.maxChars : 0;
             const profile = settleProfile(maxChars);
             runtime.profile = profile.name;
@@ -3780,7 +3761,7 @@ You must output one short parenthetical task followed by the story continuation.
             runtime.injectCap = Math.floor((maxChars || 0) * (profile.injectPercent / 100)) || Infinity;
             runtime.lean = (config.lean === true) && ["XS", "S"].includes(profile.name);
         }
-        if (config.compliance === true) {
+        {
             runtime.band = settleBand(config);
             if (runtime.band !== "healthy") {
                 // Degraded and minimal both stop the extras competing for the model's
@@ -4171,7 +4152,7 @@ You must output one short parenthetical task followed by the story continuation.
                     ? ` (last change ${CH.budget.changes[CH.budget.changes.length - 1].from} to ${CH.budget.changes[CH.budget.changes.length - 1].to} at turn ${CH.budget.changes[CH.budget.changes.length - 1].turn})`
                     : ""
                 )}`,
-                `Model compliance: ${(config.compliance === true) ? `${CH.compliance.band}, ${Math.round(complianceRate() * 100)}% of ${(CH.compliance.window || []).length} recent tasks` : "not watched"}${(
+                `Model compliance: ${CH.compliance.band}, ${Math.round(complianceRate() * 100)}% of ${(CH.compliance.window || []).length} recent tasks${(
                     ((CH.compliance.band === "minimal") && (getActionCount() < CH.compliance.cooldownUntil))
                     ? `, asking again in ${CH.compliance.cooldownUntil - getActionCount()} turns`
                     : ""
@@ -5339,78 +5320,90 @@ Follow the format **perfectly**.
                 800, (text.length - text.indexOf(boundary.upper)) + boundary.upper.length
             ));
             // Module N: one imperative line and the grammar, instead of fifteen instructions
-            // The thought task is built lazily and once, because building it consumes the
-            // same random draw Inner Self spends on its self-reflection line, and the order
-            // of those draws is what keeps a default install byte-identical
+            // Neither of these spends a random draw, so both are safe to build up front
             const directive = (R.lean === true)
                 ? leanDirective({ agent: agent.name, player: config.player, pov })
                 : prompt.directive[pov];
             const forgetTask = (R.lean === true)
                 ? leanPrompt("forget", { agent: agent.name })
                 : prompt.forget[pov];
-            let builtTask = null;
-            const thoughtTask = () => (builtTask ??= ((R.lean === true)
-                ? leanPrompt((limit < 20000) ? "assign" : "choice", { agent: agent.name })
-                // Low context = simple prompt, high context = advanced prompt
-                : ((limit < 20000) ? prompt.assign[pov] : prompt.choice[pov])
-            ));
-            if ((config.autoscale === true) || (config.diag === true)) {
-                // Module K: if this turn's injections would overrun the share of the context
-                // Chronicle is allowed, give features up in the declared order, one at a
-                // time, re-measuring after each until it fits. Nothing is shaved evenly:
-                // losing the audit entirely beats keeping half of everything
-                const weigh = () => (
-                    directive.length + overlay.length + self.length + ensemble.length
-                    + (specialTask || (full ? forgetTask : thoughtTask())).length
-                );
-                const rebuild = () => {
-                    overlay = buildOverlay(R, present, agent.name);
-                    ensemble = ensembleBlocks(R, present, agent.name, whitelist, Math.max(
-                        800, (text.length - text.indexOf(boundary.upper)) + boundary.upper.length
-                    ));
-                };
-                for (let step = 0; (step < DEGRADE_ORDER.length) && Number.isFinite(R.injectCap) && (R.injectCap < weigh()); step++) {
-                    degradeStep(R, step);
-                    rebuild();
-                }
-                // Module J: what each part of this turn cost, for /diag
-                CH.diag.cost = {
-                    world: overlay.length,
-                    brains: self.length,
-                    ensemble: ensemble.length,
-                    task: (specialTask || (full ? forgetTask : thoughtTask())).length,
-                    directive: directive.length,
-                    total: weigh(),
-                    profile: R.profile,
-                    cap: Number.isFinite(R.injectCap) ? R.injectCap : 0
-                };
-            }
-            // Modules L and M: remember what was asked, so the answer can be judged
-            CH.compliance.asked = mayAsk ? {
-                turn: getActionCount(),
-                kind: askingCanary ? "canary" : (specialTask ? "special" : (full ? "forget" : "thought"))
-            } : null;
-            // Build the final context with appropriate prompts
-            text = specialTask ? (
-                // Module B, G or M asked for this turn's slot instead
-                `${directive}${overlay}${self}${ensemble}${text.trim()}${boundary.lower}${specialTask}\n\n`
-            ) : (!mayAsk) ? (
-                // Module L: this model cannot answer right now, so nothing is asked of it.
-                // The world and the existing brains still go in, read only
-                (IS.agent = " "),
-                `${nondirective()}${overlay}${self}${ensemble}${text.trim()} `
-            ) : full ? (
+            /**
+             * Which shape this turn takes
+             *
+             * Decided before anything is measured, because deciding is what spends Inner
+             * Self's random draws: the thought chance roll, and then the self-reflection
+             * line inside the task prompt. Measuring first would pull that second draw
+             * forward and every later draw would land differently
+             * @type {string}
+             */
+            const branch = (
+                specialTask ? "special"
+                // Module L: this model cannot answer right now, so nothing is asked of it
+                : !mayAsk ? "quiet"
                 // Brain is full, prompt for deletion
-                `${directive}${overlay}${self}${ensemble}${text.trim()}${boundary.lower}${forgetTask}\n\n`
-            ) : ((config.chance / ((config.half && [
-                // config.half -> reduce task chance after Do/Say/Story actions (player is driving)
-                "do", "say", "story"
-            ].includes(getPrevAction()?.type)) ? 200 : 100)) < Math.random()) ? (
+                : full ? "forget"
+                : ((config.chance / ((config.half && [
+                    // config.half -> reduce task chance after Do/Say/Story (player is driving)
+                    "do", "say", "story"
+                ].includes(getPrevAction()?.type)) ? 200 : 100)) < Math.random())
                 // Sometimes do nothing and emit a side effect on IS.agent
-                (IS.agent = " "),
-                (CH.compliance.asked = null),
-                `${nondirective()}${overlay}${self}${ensemble}${text.trim()} `
-            ) : `${directive}${overlay}${self}${ensemble}${text.trim()}${boundary.lower}${thoughtTask()}\n\n`;
+                ? "idle"
+                : "thought"
+            );
+            const task = (
+                (branch === "special") ? specialTask
+                : (branch === "forget") ? forgetTask
+                : (branch === "thought") ? ((R.lean === true)
+                    ? leanPrompt((limit < 20000) ? "assign" : "choice", { agent: agent.name })
+                    // Low context = simple prompt, high context = advanced prompt
+                    : ((limit < 20000) ? prompt.assign[pov] : prompt.choice[pov]))
+                : ""
+            );
+            // Module K: if this turn's injections would overrun the share of the context
+            // Chronicle is allowed, give features up in the declared order, one at a time,
+            // re-measuring after each until it fits. Nothing is shaved evenly: losing the
+            // audit entirely beats keeping half of everything. With every optional module
+            // off there is nothing here to give up, and the loop changes nothing
+            const weigh = () => (
+                ((branch === "quiet") || (branch === "idle") ? 0 : directive.length)
+                + overlay.length + self.length + ensemble.length + task.length
+            );
+            for (
+                let step = 0;
+                (step < DEGRADE_ORDER.length) && Number.isFinite(R.injectCap) && (R.injectCap < weigh());
+                step++
+            ) {
+                degradeStep(R, step);
+                overlay = buildOverlay(R, present, agent.name);
+                ensemble = ensembleBlocks(R, present, agent.name, whitelist, Math.max(
+                    800, (text.length - text.indexOf(boundary.upper)) + boundary.upper.length
+                ));
+            }
+            // Module J: what each part of this turn cost, for /diag
+            CH.diag.cost = {
+                world: overlay.length,
+                brains: self.length,
+                ensemble: ensemble.length,
+                task: task.length,
+                directive: directive.length,
+                total: weigh(),
+                profile: R.profile,
+                cap: Number.isFinite(R.injectCap) ? R.injectCap : 0
+            };
+            // Modules L and M: remember what was asked, so the answer can be judged
+            CH.compliance.asked = ((branch === "quiet") || (branch === "idle")) ? null : {
+                turn: getActionCount(),
+                kind: askingCanary ? "canary" : branch
+            };
+            if ((branch === "quiet") || (branch === "idle")) {
+                IS.agent = " ";
+            }
+            // Build the final context with appropriate prompts
+            text = ((branch === "quiet") || (branch === "idle"))
+                // Nothing is asked of the model, but the world and the existing brains
+                // still go in, read only
+                ? `${nondirective()}${overlay}${self}${ensemble}${text.trim()} `
+                : `${directive}${overlay}${self}${ensemble}${text.trim()}${boundary.lower}${task}\n\n`;
         }
         // ==================== CONTEXT TRUNCATION ====================
         // Three-phase truncation to fit within AID's context limit
@@ -6170,7 +6163,7 @@ I hope you will have lots of fun!
     // ==================== MODULE L - JUDGING THE ANSWER ====================
     // A task was issued and this is what came back. Ops parsed cleanly count as compliance,
     // ops recovered from malformed output count as half, silence counts as nothing
-    if (asked && (asked.kind !== "canary") && (config.compliance === true)) {
+    if (asked && (asked.kind !== "canary")) {
         recordCompliance(
             (operations.length === 0) ? 0 : (repaired ? 0.5 : 1)
         );
