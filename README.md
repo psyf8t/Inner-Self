@@ -205,7 +205,7 @@ Turn on **"Enable player commands like /help and /undo"**, then type these as or
 | `/undo` | Revert the last committed change |
 | `/date <value>` | Set the in-game date |
 | `/audit` | Run a continuity check on the next turn |
-| `/diag` | Context profile, compliance band, whether injections are landing, per-module cost, state size, timings, recent transactions |
+| `/diag` | Which settings the context profile is overruling and by how much, context profile, compliance band, whether injections are landing, per-module cost, state size, timings, recent transactions |
 
 A command answers you in a message and stops the turn, so no generation is spent on it. Anything else beginning with `/` falls through to the story untouched.
 
@@ -267,7 +267,8 @@ A story card called "Chronicle" holds the in-game date, location, active arc, fa
 
 **You notice:** the narrator stops forgetting where you are and what day it is. Edit the card and Chronicle believes you over its own memory, immediately.
 **Settings:** *Maximum characters of world state per turn* (default 700) · *In-game date the adventure began on* (default "Day 1") · *Maximum days one turn may advance* (default 30).
-**Small print:** the calendar moves on narrative phrasing, from an editable table (`TIME_TABLE`) mapping things like "the next morning" or "a fortnight later" to days. An explicit `[+3 days]` marker in the text is trusted past the per-turn cap. When the block does not fit, whole lines are dropped by priority; nothing is cut mid-sentence.
+**Calendar:** the date carries a season and a year, both derived from the day count so they cannot drift out of step with it. The season names and season length are yours to edit on the Chronicle card — `Seasons: Spring; Summer; Autumn; Winter` and `Season length: 91` — and a scenario with its own calendar just writes its own names there.
+**Small print:** the calendar moves on narrative phrasing, from an editable table (`TIME_TABLE`) mapping both time skips ("the next morning", "a fortnight later") and travel ("you set off for the guild", "three days on the road", "for two weeks") onto days. An explicit `[+3 days]` marker is trusted past the per-turn cap. One advance per turn: the first phrase that matches wins. Travel phrasing is a heuristic and your scenario will have its own — that table is where you add it. When the block does not fit, whole lines are dropped by priority; nothing is cut mid-sentence.
 
 ### D — Ensemble
 
@@ -362,7 +363,7 @@ Reads `info.maxChars` every turn and maps it to a profile, then derives every in
 
 **You notice:** the world block gets shorter and the audit stops when your context shrinks, instead of everything being truncated at random. `/diag` names the current profile and the last change.
 **Settings:** none. The profile table is `BUDGET_TABLE` at the top of the module, and editing it is how you change what each size buys.
-**Small print:** because it always runs, a profile can cap a setting you chose. Asking for three concurrent brains at a 25,000 character context gets you one, and asking for an audit every 10 turns gets you one every 150 at that size. `/diag` shows which profile you are in.
+**Small print:** because it always runs, a profile can cap a setting you chose. Asking for three concurrent brains at a 25,000 character context gets you one, and asking for an audit every 10 turns gets you one every 150 at that size. `/diag` names every override explicitly — `brains 1 (you set 3)` — so a capped setting is never silent.
 
 ### L — Compliance monitor
 
@@ -518,6 +519,8 @@ Leave **D** off unless you know your players have a large context.
 ## Honest limitations
 
 Things that are true and worth knowing before you are disappointed by them.
+
+**The sanitizer keeps prose that Inner Self deleted.** Inner Self dropped any output line containing "task" or "output", or containing both "story" and "continu" — ordinary English words. A model answering in a single paragraph containing one of them had its entire generation erased. Chronicle matches the shapes leaked prompt text actually takes instead: SYSTEM tags, markdown headers, shouted instruction lines, and the grammar examples verbatim. This is a deliberate divergence from upstream, and both halves of it are pinned by tests.
 
 **Presence detection and the calendar are heuristics, not understanding.** Module D decides who is in a scene by looking for a name followed by a verb-ish word, or near dialogue, and by rejecting names preceded by a preposition — that list is `MENTION_WORDS` at the top of the module. Module C moves the date by matching phrases from `TIME_TABLE`. Both are plain tables near the top of their modules, and both will misfire: an unusual sentence shape will make someone furniture, and a phrase your scenario uses for time skips will do nothing until you add it. When one misfires, edit the table.
 

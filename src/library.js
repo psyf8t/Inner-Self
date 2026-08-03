@@ -627,6 +627,9 @@ function Chronicle(hook) {
         world: {
             date: "",
             day: 1,
+            // The calendar the day count is read against, editable on the Chronicle card
+            seasonLength: 91,
+            seasons: ["Spring", "Summer", "Autumn", "Winter"],
             place: "",
             arc: "",
             factions: {},
@@ -654,8 +657,9 @@ function Chronicle(hook) {
         console: { stop: false },
         // Who is writing this turn, so a batch of retry candidates all reach the same brain
         writer: null,
-        // Module J: hook timings, skips, and the state size warning latch
-        diag: { hooks: { input: [], context: [], output: [] }, skips: 0, warned: false },
+        // Module J: hook timings, skips, the state size warning latch, and which settings
+        // the context profile is currently overruling
+        diag: { hooks: { input: [], context: [], output: [] }, skips: 0, warned: false, caps: {} },
         // Module J: cached story card positions, validated on use
         index: {},
         // Values for rows the cards are not currently showing, so that switching a module
@@ -2214,6 +2218,62 @@ function Chronicle(hook) {
         }
     };
     /**
+     * Parks a transaction for the next turn to settle
+     *
+     * Both output paths stage through here: the one where a character formed a thought, and
+     * the one where nobody did but the world moved anyway
+     * @param {Object[]} staged - Operation descriptors
+     * @param {Object|null} agent - The writing agent, or null when the world moved alone
+     * @param {number} labelStart - Where the label counter stood before this transaction
+     * @param {Object} config - Validated config
+     * @param {string[]} actors - Who the turn named
+     * @returns {void}
+     */
+    const parkTransaction = (staged = [], agent = null, labelStart = 0, config = {}, actors = []) => {
+        CH.pending = {
+            // The turn that produced these operations, which a later turn must move past
+            actionCount: getActionCount(),
+            // How a later turn recognizes this exact generation inside history
+            fingerprint: fingerprint(text),
+            // Where to rewind the label counter if this generation is discarded
+            labelStart,
+            // The markers embedded in the prose, a second way to recognize the generation
+            encoding: IS.encoding,
+            // Whose brain these operations belong to, empty when the world moved but nobody
+            // in it happened to be thinking
+            agent: agent ? agent.name : "",
+            // Settings captured now, so the commit needs no config card of its own
+            percent: agent ? agent.metadata.percent : config.percent,
+            json: (config.json === true),
+            // Module settings as they stood when this generation happened
+            cfg: moduleConfig(config),
+            // Module E: who was in the room, and therefore who saw what
+            actors,
+            // Everyone who could hear a rumour, for propagation at commit time
+            agents: (config.agents || []).slice(0, 24),
+            ops: staged
+        };
+        // Keep every staging made for this same turn, newest last, capped
+        CH.candidates = [
+            ...(Array.isArray(CH.candidates) ? CH.candidates : []).filter(
+                candidate => (candidate && (candidate.actionCount === CH.pending.actionCount))
+            ),
+            CH.pending
+        ].slice(-CAP.candidates);
+        // Instrumentation for the open question of how many times onOutput fires per visible
+        // turn. Every entry here is one call, with the turn it claimed and what it staged
+        CH.diag.stagings = [
+            ...(Array.isArray(CH.diag.stagings) ? CH.diag.stagings : []),
+            { t: CH.pending.actionCount, h: CH.pending.fingerprint, n: staged.length }
+        ].slice(-8);
+        // Inner Self stored this hash to suppress a second write on retry, and Chronicle
+        // never reads it. It is still written so a rollback finds the value that version
+        // would have left behind
+        IS.hash = historyHash();
+        journal("stage", { ops: staged.length, agent: agent ? agent.name : "" });
+        return;
+    };
+    /**
      * Resolves whatever transaction is staged, at the top of every hook
      *
      * Commits only when both hold:
@@ -2768,13 +2828,30 @@ You must output one short parenthetical task followed by the story continuation.
     `.trim();
     // ==================== MODULE C - WORLD CHRONICLE ====================
     /**
+     * Written numbers the calendar understands, so "three days on the road" counts as three
+     * @type {Object}
+     */
+    const NUMBER_WORDS = Object.freeze({
+        a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,
+        eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, several: 4, few: 3
+    });
+    /**
      * How narrative phrasing maps onto the calendar
-     * This table is meant to be edited: add the phrasings your scenario actually uses
-     * Order matters, the first match wins, so keep the specific phrases above the vague ones
+     *
+     * This table is meant to be edited: add the phrasings your scenario actually uses. Order
+     * matters, the first match wins, so the specific phrases sit above the vague ones and
+     * anything carrying a number sits above the defaults.
+     *
+     * A rule is one of three shapes: days is a fixed number of days, days null reads the
+     * number out of an explicit [+n days] marker, and span reads a written or digit number
+     * from the first capture group and a unit from the second
      * @type {Object[]}
      */
     const TIME_TABLE = Object.freeze([
         { pattern: /\[\s*\+\s*(\d{1,3})\s*days?\s*\]/i, days: null },
+        // Journeys with a stated length, which is what a travel scene usually gives you
+        { pattern: /\b(?:after|for|took|takes|taking|lasted|lasting|spent)\s+(?:about\s+|nearly\s+|almost\s+)?(\d{1,3}|[a-z]+)\s+(days?|weeks?|months?)\b/i, span: true },
+        { pattern: /\b(\d{1,3}|[a-z]+)\s+(days?|weeks?|months?)\s+(?:of\s+)?(?:on the road|travel|travelling|traveling|riding|sailing|marching|later|pass|passed|go by|gone by)\b/i, span: true },
         { pattern: /\b(?:a|one) fortnight(?: later| passes)?\b/i, days: 14 },
         { pattern: /\b(?:several|a few) weeks?\b/i, days: 21 },
         { pattern: /\b(?:the )?(?:next|following) week\b/i, days: 7 },
@@ -2782,15 +2859,47 @@ You must output one short parenthetical task followed by the story continuation.
         { pattern: /\b(?:several|a few|some) days (?:later|pass|go by)\b/i, days: 3 },
         { pattern: /\b(?:a couple of|two) days (?:later|pass)\b/i, days: 2 },
         { pattern: /\bthe (?:day|morning) after (?:next|tomorrow)\b/i, days: 2 },
+        // Travel without a stated length. A departure is assumed to cost a day, which is
+        // the least surprising default; change it here if your map is larger or smaller
+        { pattern: /\b(?:set(?:s|ting)? (?:off|out)|depart(?:s|ed|ing)?|ride(?:s|ing)? out|take(?:s|n)? (?:to )?the road|make(?:s)? for|strike(?:s)? out)\b[^.!?]{0,40}\b(?:for|to|toward|towards|north|south|east|west)\b/i, days: 1 },
+        { pattern: /\b(?:the )?(?:journey|voyage|crossing|march|ride)\b[^.!?]{0,30}\b(?:to|toward|towards|takes|took)\b/i, days: 1 },
+        { pattern: /\b(?:arrive[sd]?|reach(?:es|ed)?)\b[^.!?]{0,30}\bafter (?:a|the) long (?:ride|walk|journey|march|road)\b/i, days: 1 },
+        { pattern: /\bon the road\b/i, days: 1 },
         { pattern: /\b(?:the )?(?:next|following) (?:morning|day|dawn|evening)\b/i, days: 1 },
         { pattern: /\bthat night(?:,| ) (?:you|he|she|they) sleep\b/i, days: 1 },
         { pattern: /\btomorrow\b/i, days: 1 },
         { pattern: /\bmonths? (?:later|pass)\b/i, days: 30 },
-        { pattern: /\ba year (?:later|passes)\b/i, days: 30 }
+        { pattern: /\ba year (?:later|passes)\b/i, days: 365 }
     ]);
+    /**
+     * Where in the year a given day falls
+     *
+     * A bare day counter tells a story nothing. Season and year are derived from the day
+     * rather than stored, so they cannot drift out of step with it, and the season names and
+     * length are the player's to edit on the Chronicle card
+     * @param {number} day - Day number, counting from one
+     * @returns {Object} { season, year }
+     */
+    const seasonOf = (day = 1) => {
+        const world = CH.world;
+        const names = (Array.isArray(world.seasons) && (0 < world.seasons.length))
+            ? world.seasons
+            : ["Spring", "Summer", "Autumn", "Winter"];
+        const length = (Number.isInteger(world.seasonLength) && (0 < world.seasonLength))
+            ? world.seasonLength
+            : 91;
+        const elapsed = Math.max(0, day - 1);
+        const year = 1 + Math.floor(elapsed / (length * names.length));
+        return { season: names[Math.floor(elapsed / length) % names.length], year };
+    };
     /** The world card's field order, which is also its priority order when space runs out */
     const WORLD_FIELDS = Object.freeze([
         { key: "date", label: "Date", priority: 1 },
+        // Read from and written to the card, never injected: the model needs the date, not
+        // the rules the date is derived under
+        { key: "seasonLength", label: "Season length", priority: 90, number: true, cardOnly: true },
+        // Required: a blank row means "I did not change this", not "the year has no seasons"
+        { key: "seasons", label: "Seasons", priority: 91, list: true, cardOnly: true, required: true },
         { key: "place", label: "Location", priority: 2 },
         { key: "arc", label: "Arc", priority: 3 },
         { key: "threats", label: "Open threats", priority: 4, list: true },
@@ -2812,8 +2921,13 @@ You must output one short parenthetical task followed by the story continuation.
         const card = ownCard(
             "Chronicle",
             "The world as Chronicle currently understands it.",
+            // Created showing the defaults, so the calendar rules are visible and editable
+            // from the first turn rather than appearing as blank rows
             WORLD_FIELDS.map(field => `${field.label}: ${(
-                (field.key === "date") ? (startDate || world.date || "Day 1") : ""
+                (field.key === "date") ? (startDate || world.date || "Day 1")
+                : Array.isArray(world[field.key]) ? world[field.key].join("; ")
+                : (field.number === true) ? world[field.key]
+                : ""
             )}`).join("\n")
         );
         if (!card) {
@@ -2825,8 +2939,16 @@ You must output one short parenthetical task followed by the story continuation.
             if (typeof raw !== "string") {
                 continue;
             }
-            if (field.list) {
-                world[field.key] = readList(raw);
+            if (field.number) {
+                const parsed = parseInt(String(raw).replace(/[^\d]/g, ""), 10);
+                world[field.key] = (Number.isInteger(parsed) && (0 < parsed))
+                    ? Math.min(parsed, 3650)
+                    : world[field.key];
+            } else if (field.list) {
+                const parsed = readList(raw, 12);
+                if ((0 < parsed.length) || (field.required !== true)) {
+                    world[field.key] = parsed;
+                }
             } else if (field.map) {
                 const map = {};
                 for (const part of readList(raw, 12)) {
@@ -2854,6 +2976,9 @@ You must output one short parenthetical task followed by the story continuation.
         const world = CH.world;
         card.description = WORLD_FIELDS.map(field => {
             const value = world[field.key];
+            if (field.number) {
+                return `${field.label}: ${value}`;
+            }
             if (field.list) {
                 return `${field.label}: ${(Array.isArray(value) ? value : []).join("; ")}`;
             }
@@ -2876,7 +3001,18 @@ You must output one short parenthetical task followed by the story continuation.
         const world = CH.world;
         const lines = [];
         for (const field of WORLD_FIELDS) {
+            if (field.cardOnly === true) {
+                continue;
+            }
             const value = world[field.key];
+            if (field.key === "date") {
+                const { season, year } = seasonOf(world.day);
+                const dated = `${value ?? ""}${(season ? `, ${season}, year ${year}` : "")}`.trim();
+                if (dated !== "") {
+                    lines.push({ priority: field.priority, text: `- ${field.label}: ${dated}` });
+                }
+                continue;
+            }
             const rendered = (
                 field.list ? (Array.isArray(value) ? value : []).join("; ")
                 : field.map ? Object.entries(value || {}).map(([k, v]) => `${k} ${(0 <= v) ? "+" : ""}${v}`).join("; ")
@@ -2939,6 +3075,18 @@ You must output one short parenthetical task followed by the story continuation.
                 // so it is trusted beyond the per-turn cap
                 const days = parseInt(match[1], 10);
                 return (Number.isInteger(days) && (0 < days)) ? Math.min(days, 3650) : 0;
+            }
+            if (rule.span === true) {
+                // A journey with a stated length: "three days on the road", "for two weeks"
+                const written = String(match[1]).toLowerCase();
+                const count = Object.prototype.hasOwnProperty.call(NUMBER_WORDS, written)
+                    ? NUMBER_WORDS[written]
+                    : parseInt(written, 10);
+                if (!Number.isInteger(count) || (count < 1)) {
+                    continue;
+                }
+                const unit = /week/i.test(match[2]) ? 7 : (/month/i.test(match[2]) ? 30 : 1);
+                return Math.min(count * unit, maxDays);
             }
             return Math.min(rule.days, maxDays);
         }
@@ -3964,14 +4112,42 @@ You must output one short parenthetical task followed by the story continuation.
             const maxChars = Number.isInteger(info.maxChars) ? info.maxChars : 0;
             const profile = settleProfile(maxChars);
             runtime.profile = profile.name;
+            /**
+             * Records a setting the profile overruled
+             *
+             * A player who asked for three brains and got one deserves to be told which
+             * of the two decided, rather than filing it as a bug
+             * @param {string} name - How the setting reads on the card
+             * @param {*} asked - What the player set
+             * @param {*} got - What the profile allowed
+             * @returns {void}
+             */
+            const capped = (name = "", asked = null, got = null) => {
+                if (asked !== got) {
+                    CH.diag.caps[name] = { asked, got };
+                }
+                return;
+            };
+            CH.diag.caps = {};
             // A profile only ever takes away. The player's own settings stay the ceiling
             runtime.worldChars = Math.min(config.worldChars, profile.chronicle);
             runtime.brains = Math.min(config.brains, profile.brains);
+            capped("world block", config.worldChars, runtime.worldChars);
+            capped("brains", config.brains, runtime.brains);
             runtime.digests = profile.digests;
             runtime.witness = profile.witness;
             runtime.clockLines = profile.clockLines;
             runtime.auditEvery = (profile.audit === 0) ? 0 : Math.max(config.auditEvery, profile.audit);
             runtime.audit = (config.audit === true) && (profile.audit !== 0);
+            if (config.audit === true) {
+                capped("audits every", config.auditEvery, (profile.audit === 0) ? "off" : runtime.auditEvery);
+            }
+            if ((config.ensemble === true) && (profile.digests === 0)) {
+                capped("ensemble digests", "on", "off");
+            }
+            if ((config.knows === true) && (profile.witness === 0)) {
+                capped("witness lines", "on", "off");
+            }
             runtime.injectCap = Math.floor((maxChars || 0) * (profile.injectPercent / 100)) || Infinity;
             runtime.lean = (config.lean === true) && ["XS", "S"].includes(profile.name);
         }
@@ -4226,7 +4402,7 @@ You must output one short parenthetical task followed by the story continuation.
         if (name === "state") {
             const world = CH.world;
             return [
-                `Date: ${world.date}`,
+                `Date: ${world.date}, ${seasonOf(world.day).season}, year ${seasonOf(world.day).year} (day ${world.day})`,
                 `Location: ${world.place || "unrecorded"}`,
                 `Arc: ${world.arc || "unrecorded"}`,
                 `Standing: ${Object.entries(world.factions).map(([k, v]) => `${k} ${(0 <= v) ? "+" : ""}${v}`).join(", ") || "none"}`,
@@ -4361,6 +4537,12 @@ You must output one short parenthetical task followed by the story continuation.
             );
             const cost = CH.diag.cost || {};
             return [
+                `Overruled by profile ${CH.budget.profile}: ${(() => {
+                    const caps = Object.entries(CH.diag.caps || {});
+                    return caps.length
+                        ? caps.map(([name, cap]) => `${name} ${cap.got} (you set ${cap.asked})`).join(", ")
+                        : "nothing, you are getting what you asked for";
+                })()}`,
                 `Context: ${CH.budget.maxChars || "unread"} chars, profile ${CH.budget.profile || "not scaling"}${(
                     (0 < (CH.budget.changes || []).length)
                     ? ` (last change ${CH.budget.changes[CH.budget.changes.length - 1].from} to ${CH.budget.changes[CH.budget.changes.length - 1].to} at turn ${CH.budget.changes[CH.budget.changes.length - 1].turn})`
@@ -4425,6 +4607,13 @@ You must output one short parenthetical task followed by the story continuation.
         // and the discard site for a retry, whose context hook runs while onInput does not
         settlePending();
         // Calculate the player's context limit with a small buffer
+        //
+        // The budget is measured on the context as it arrived, markers and all, and that is
+        // deliberate: the platform sent this many characters, so returning no more than this
+        // many is safe whatever form they are in. Measuring the decoded length instead was
+        // tried and reverted; it shrinks the story window by however many markers the
+        // adventure has accumulated, for no gain, since the ceiling is info.maxChars either
+        // way. The debug assertion after truncation is what watches for real drift
         const limit = Math.max((Math.min(text.length, info.maxChars) - 10), 4500);
         // Ensure stop variable exists (the AID script sandbox is silly)
         globalThis.stop ??= false;
@@ -5686,6 +5875,18 @@ Follow the format **perfectly**.
         setMarker(boundary.upper, `\n\n${boundary.needle}\n`);
         setMarker(boundary.lower, "\n\n")
         text = text.trimStart() || " ";
+        if (config.debug) {
+            // Debug builds shout about the two ways an offset can go wrong here: a budget
+            // that was measured against a different form of the string, and a marker that
+            // survived decoding and would make every later length disagree with the text
+            if (limit < text.length) {
+                log(`Chronicle: context is ${text.length} chars against a ${limit} budget`);
+            }
+            const survivors = (text.match(/[\u200B-\u200D\uFEFF]/g) || []).length;
+            if (0 < survivors) {
+                log(`Chronicle: ${survivors} zero-width chars survived decoding, offsets may drift`);
+            }
+        }
         writeDiagnostics(config);
         recordTiming("context");
         return;
@@ -6059,6 +6260,57 @@ I hope you will have lots of fun!
             && !str.includes(";") && !str.endsWith("—") && !str.startsWith("—")
         ) ? str.replace("—", "; ") : str;
     };
+    // ==================== MODULE SCANS ====================
+    // These read the turn's prose rather than a parenthetical: time passing, the clock
+    // triggers the player declared, and who was in the room for it
+    // Everything they find is staged, so a retried turn does not move the calendar twice
+    //
+    // They run on every turn, including turns where nobody was asked to think. Time passes
+    // in scenes where no character happens to be forming a thought, and it took a live game
+    // to notice that the calendar had been standing still on those turns
+    const namesIn = (prose = "") => config.agents.filter(name => {
+        const lower = String(prose).toLowerCase();
+        const needle = name.toLowerCase();
+        for (let p = lower.indexOf(needle); (p !== -1); p = lower.indexOf(needle, p + 1)) {
+            const before = (0 < p) ? lower.charCodeAt(p - 1) : 0;
+            const after = ((p + needle.length) < lower.length) ? lower.charCodeAt(p + needle.length) : 0;
+            if (((before < 97) || (122 < before)) && ((after < 97) || (122 < after))) {
+                return true;
+            }
+        }
+        return false;
+    });
+    /**
+     * Everything the turn's prose implies, as staged operations
+     * @param {string} prose - The turn's text, with any parenthetical already removed
+     * @returns {Object[]} Operation descriptors, possibly empty
+     */
+    const moduleScans = (prose = "") => {
+        const found = [];
+        const actors = namesIn(prose);
+        if (config.world === true) {
+            const days = readTimePassage(prose, config.maxDays);
+            if (0 < days) {
+                found.push({ mod: "world", op: "advanceDays", n: days });
+            }
+        }
+        if (config.clocks === true) {
+            for (const id of triggeredClocks(readClocks(), prose).slice(0, 3)) {
+                found.push({ mod: "clock", op: "tick", id, n: 1 });
+            }
+            if (CH.fire && (CH.fire.turn === getActionCount()) && Array.isArray(CH.fire.ids)) {
+                // The directive went out in this turn's context, so the queue entry is spent
+                found.push({ mod: "queue", op: "fire", ids: CH.fire.ids });
+                CH.fire = null;
+            }
+        }
+        if ((config.knows === true) && (0 < actors.length)) {
+            found.push({
+                mod: "event", op: "record", actors, place: CH.world.place, tag: tagEvent(prose)
+            });
+        }
+        return found;
+    };
     // Trim IS.agent name before emptiness check
     if (((IS.agent = IS.agent.trim()) === "") && (blocks.length === 0)) {
         // No task expected, but I'm still careful here because AID retries use cached outputs
@@ -6077,6 +6329,13 @@ I hope you will have lots of fun!
             // Ensure taskless outputs still have a space of separation from the previous action
             text = ` ${text}`;
         }
+        // Nobody was asked to think this turn, but the world does not wait for that. Time
+        // passing, a declared clock trigger and who was present are all still worth staging
+        const quiet = moduleScans(text);
+        if (0 < quiet.length) {
+            parkTransaction(quiet, null, IS.label, config, namesIn(text));
+        }
+        recordTiming("output");
         return;
     }
     // formatKey and path now live beside the transaction ledger, which needs them at commit
@@ -6328,35 +6587,63 @@ I hope you will have lots of fun!
     // ==================== OUTPUT TEXT SANITIZATION ====================
     // Clean up the model's output text before finalizing
     // This removes artifacts, formatting issues, and unwanted patterns
+    /**
+     * Does this line look like the task prompt bleeding into the story?
+     *
+     * Inner Self dropped any line containing "task" or "output", or containing both "story"
+     * and "continu". Those are ordinary English words: "Leah set about her task without
+     * another word" was deleted, and a model that answers in one paragraph had its entire
+     * generation erased. Measured at five ordinary prose lines in ten.
+     *
+     * Leaked prompt text does not look like prose. It carries SYSTEM tags, markdown
+     * headers, shouting, or the grammar examples verbatim, and that is what this matches
+     * @param {string} line - One line of model output
+     * @returns {boolean} true if the line should be dropped
+     */
+    const leaked = (line = "") => {
+        const trimmed = line.trim();
+        if (trimmed === "") {
+            return false;
+        }
+        // The prompts are markdown wrapped in SYSTEM tags; prose is neither
+        if (/<\/?\s*SYSTEM\s*>/i.test(trimmed) || /^#{1,6}\s/.test(trimmed) || /^-{3,}$/.test(trimmed)) {
+            return true;
+        }
+        // The grammar examples, echoed verbatim
+        if (/any_key_name|key_name_to_forget|example_key|example_name|unwanted_key|new_key_name|old_key_name|any_key\b|renamed_key/.test(trimmed)) {
+            return true;
+        }
+        // The "EXACT SHAPE" lines, which always open by narrating the instruction itself
+        if (/^story continu/i.test(trimmed)) {
+            return true;
+        }
+        // Shouting: a mostly capitalised line carrying one of the prompt's own words. Real
+        // prose does not shout eight letters of capitals at a time
+        const letters = trimmed.replace(/[^a-zA-Z]/g, "");
+        const capitals = trimmed.replace(/[^A-Z]/g, "");
+        if (
+            (8 <= letters.length)
+            && (0.6 <= (capitals.length / letters.length))
+            && /STRICT|OUTPUT|REQUIRED|EXACT|TASK|FORMAT|RULES|SUMMARY|SHAPE|SYSTEM|PERSPECTIVE|PARENTHES|STORAGE BEHAVIOR|EXTRA TEXT|SENTENCE|BACKTICK|SNAKE|KEY NAME/.test(trimmed)
+        ) {
+            return true;
+        }
+        // The prompt addressing the player flatly, rather than the story doing it
+        if ((config.player !== "") && (trimmed === `You are ${config.player}.`)) {
+            return true;
+        }
+        // Stray role labels from ChatML imitation. A label stands alone or takes a colon;
+        // "user, she thought, was a strange word for it" is a sentence
+        if (/^user\s*:?\s*$/i.test(trimmed) || /^user\s*:/i.test(trimmed)) {
+            return true;
+        }
+        // Lines containing only spaces and dashes
+        return /^[ -]+$/.test(trimmed);
+    };
     text = (simplify(config.debug ? text : text.replaceAll("_", ""))
         .trim()
         .split("\n")
-        .filter(line => {
-            const lower = line.toLowerCase();
-            return !(
-                // The nuclear option
-                /(?:^|[^a-zA-Z])(?:task|output)(?:$|[^a-zA-Z])/.test(lower)
-                // Common AI hallucinations
-                || [
-                    "STRICT",
-                    "OUTPUT",
-                    "REQUIRE",
-                    "EXACT",
-                    "TASK",
-                    "FORMAT",
-                    "inner self",
-                    `You are ${config.player}.`
-                ].some(naughty => line.includes(naughty))
-                // Remove "story continues" type artifacts from task prompts bleeding through
-                || (lower.includes("story") && lower.includes("continu"))
-                // Remove numbered list items (e.g., "1.", "[1]", "2.")
-                || /^\[?\d+(?:\.?\]|\.)/.test(lower)
-                // Remove stray "user" labels from ChatML imitation
-                || /^\s*user(?:$|[^a-z])/.test(lower)
-                // Remove lines containing only " " and/or "-"
-                || /^[ -]+$/.test(lower)
-            );
-        })
+        .filter(line => !leaked(line))
         .join("\n")
         .trim()
         // Collapse excessive newlines to a maximum of two
@@ -6383,43 +6670,9 @@ I hope you will have lots of fun!
         );
         CH.compliance.asked = null;
     }
-    // ==================== MODULE SCANS ====================
-    // These read the turn's prose rather than a parenthetical: time passing, the clock
-    // triggers the player declared, and who was in the room for it
-    // Everything they find is staged, so a retried turn does not move the calendar twice
-    const actors = config.agents.filter(name => {
-        const lower = text.toLowerCase();
-        const needle = name.toLowerCase();
-        for (let p = lower.indexOf(needle); (p !== -1); p = lower.indexOf(needle, p + 1)) {
-            const before = (0 < p) ? lower.charCodeAt(p - 1) : 0;
-            const after = ((p + needle.length) < lower.length) ? lower.charCodeAt(p + needle.length) : 0;
-            if (((before < 97) || (122 < before)) && ((after < 97) || (122 < after))) {
-                return true;
-            }
-        }
-        return false;
-    });
-    if (config.world === true) {
-        const days = readTimePassage(text, config.maxDays);
-        if (0 < days) {
-            operations.push({ mod: "world", op: "advanceDays", n: days });
-        }
-    }
-    if (config.clocks === true) {
-        for (const id of triggeredClocks(readClocks(), text).slice(0, 3)) {
-            operations.push({ mod: "clock", op: "tick", id, n: 1 });
-        }
-        if (CH.fire && (CH.fire.turn === getActionCount()) && Array.isArray(CH.fire.ids)) {
-            // The directive went out in this turn's context, so the queue entry is spent
-            operations.push({ mod: "queue", op: "fire", ids: CH.fire.ids });
-            CH.fire = null;
-        }
-    }
-    if ((config.knows === true) && (0 < actors.length)) {
-        operations.push({
-            mod: "event", op: "record", actors, place: CH.world.place, tag: tagEvent(text)
-        });
-    }
+    // Module scans, defined above so both output paths can use them
+    const actors = namesIn(text);
+    operations.push(...moduleScans(text));
     // ==================== TRANSACTION STAGING ====================
     // Stage the turn's operations instead of writing them
     // Nothing below touches a story card: the ledger commits on the next turn, once the
@@ -6465,48 +6718,7 @@ I hope you will have lots of fun!
         );
     }
     text ||= "\u200B";
-    // Park the transaction. A retry overwrites this record whole, it never merges into it
-    CH.pending = {
-        // The turn that produced these operations, which a later turn must move past
-        actionCount: getActionCount(),
-        // How a later turn recognizes this exact generation inside history
-        fingerprint: fingerprint(text),
-        // Where to rewind the label counter if this generation is discarded
-        labelStart,
-        // The markers embedded above, kept as a second way to recognize the generation
-        encoding: IS.encoding,
-        // Whose brain these operations belong to, empty when the world moved but nobody
-        // in it happened to be thinking
-        agent: agent ? agent.name : "",
-        // Settings captured now, so the commit needs no config card of its own
-        percent: agent ? agent.metadata.percent : config.percent,
-        json: (config.json === true),
-        // Module settings as they stood when this generation happened
-        cfg: moduleConfig(config),
-        // Module E: who was in the room, and therefore who saw what
-        actors,
-        // Everyone who could hear a rumour, for propagation at commit time
-        agents: config.agents.slice(0, 24),
-        ops: staged
-    };
-    // Inner Self stored this hash to suppress a second write on retry, and Chronicle never
-    // reads it. It is still written here so an adventure rolled back to Inner Self finds
-    // exactly the value that version would have left behind
-    // Keep every staging made for this same turn, newest last, capped
-    CH.candidates = [
-        ...(Array.isArray(CH.candidates) ? CH.candidates : []).filter(
-            candidate => (candidate && (candidate.actionCount === CH.pending.actionCount))
-        ),
-        CH.pending
-    ].slice(-CAP.candidates);
-    // Instrumentation for the open question of how many times onOutput fires per visible
-    // turn. Every entry here is one call, with the turn it claimed and what it staged
-    CH.diag.stagings = [
-        ...(Array.isArray(CH.diag.stagings) ? CH.diag.stagings : []),
-        { t: CH.pending.actionCount, h: CH.pending.fingerprint, n: staged.length }
-    ].slice(-8);
-    IS.hash = historyHash();
-    journal("stage", { ops: staged.length, agent: agent ? agent.name : "" });
+    parkTransaction(staged, agent, labelStart, config, actors);
     if (config.canary === true) {
         // Module M: memory written here takes effect from the next action, which is
         // exactly when the fallback is needed

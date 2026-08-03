@@ -2597,6 +2597,286 @@ test("Chronicle's own cards carry no trigger keys", () => {
     assert(2 < seen, `expected Chronicle's own cards to exist, found ${seen}`);
 });
 
+// ---------------------------------------------------------------- 25. output integrity
+
+suite("25. The generation reaches the player intact");
+
+/** An adventure with one character triggered, ready to be handed a generation */
+function armed(seed = 7, player = "") {
+    const adventure = newAdventure("chronicle", { seed });
+    seedAgents(adventure);
+    adventure.hook("input", "> You meet Leah.");
+    adventure.push("> You meet Leah.", "do");
+    adventure.hook("context", buildContext(adventure));
+    if (player !== "") {
+        editSetting(adventure, ROWS.player, `"${player}"`);
+        adventure.hook("context", buildContext(adventure));
+    }
+    adventure.push("Leah looks up.", "continue");
+    return adventure;
+}
+
+const stripZW = (text) => String(text).replace(/[​-‍﻿]/g, "");
+
+test("nothing is taken off the end of a generation, at any length", () => {
+    // Bug report: output cut mid-word, sometimes on the first letter of the last word.
+    // The label encoding inserts invisible characters, so this sweeps lengths and word
+    // boundaries looking for an offset that drifts by exactly that many
+    const adventure = armed(11);
+    const endings = ["the lamp", "a", "io", "Leah", "it", '"yes"', "the ledger.", "Silas'"];
+    let checked = 0;
+    const damaged = [];
+    for (const ending of endings) {
+        for (let pad = 0; pad < 90; pad += 6) {
+            for (const withOperation of [true, false]) {
+                const prose = `Iris walked on. ${"The tide clock ticks. ".repeat(pad % 8)}She reached for ${ending}`;
+                const model = withOperation
+                    ? `(courier_debt = \`I counted ${pad} crates.\`) ${prose}`
+                    : prose;
+                adventure.state.InnerSelf.agent = "Leah";
+                const out = stripZW(adventure.hook("output", model)).trimEnd();
+                adventure.push(out, "continue");
+                checked++;
+                if (!out.endsWith(ending)) {
+                    damaged.push(`wanted ...${JSON.stringify(ending)}, got ...${JSON.stringify(out.slice(-30))}`);
+                }
+            }
+        }
+    }
+    assert(200 < checked, `only ${checked} cases swept`);
+    assertEqual(damaged.length, 0, `${damaged.length} generations lost their tail:\n  ${damaged.slice(0, 5).join("\n  ")}`);
+});
+
+test("the label markers are the only characters the hook adds", () => {
+    const adventure = armed(12);
+    const prose = "Iris follows Leah along the row, and the tide clock knocks twice.";
+    adventure.state.InnerSelf.agent = "Leah";
+    const out = adventure.hook("output", `(courier_debt = \`I counted the crates.\`) ${prose}`);
+    const visible = stripZW(out).trim();
+    assertEqual(visible, prose, "the prose came back changed once the markers were stripped");
+    assert(out.length > visible.length, "no markers were embedded at all");
+});
+
+test("ordinary prose survives words the old filter treated as leaked prompt", () => {
+    // Inner Self dropped any line containing "task" or "output", or both "story" and
+    // "continu". Those are ordinary English. A model answering in one paragraph had its
+    // whole generation erased, which is what "the generation just stops" looked like
+    const adventure = armed(13);
+    const lines = [
+        "Leah set about her task without another word.",
+        "The output of the mill had fallen again that season.",
+        "She required an exact count before the tide turned.",
+        "Iris told her the story continued at the wharf.",
+        "The format of the ledger had never mattered before.",
+        "A strict man, the harbourmaster, and a fair one.",
+        "1. The first crate was short.",
+        "user, she thought, was a strange word for it."
+    ];
+    for (const line of lines) {
+        adventure.state.InnerSelf.agent = "Leah";
+        const out = stripZW(adventure.hook("output", `(courier_debt = \`I counted them.\`) ${line}`));
+        adventure.push(out, "continue");
+        assert(out.includes(line), `ordinary prose was deleted: ${JSON.stringify(line)}`);
+    }
+});
+
+test("a one paragraph generation is never erased outright", () => {
+    const adventure = armed(14);
+    for (const prose of [
+        "Leah set about her task without another word, and Iris followed her to the wharf.",
+        "The story continued long after the tide had turned, and nobody spoke of it again."
+    ]) {
+        adventure.state.InnerSelf.agent = "Leah";
+        const out = stripZW(adventure.hook("output", `(courier_debt = \`I counted them.\`) ${prose}`)).trim();
+        adventure.push(out, "continue");
+        assertEqual(out, prose, "a whole generation was erased by the sanitizer");
+    }
+});
+
+test("upstream really does delete that prose, so the divergence is deliberate", () => {
+    // Pinning the difference rather than claiming byte parity where there is none
+    const upstreamRun = new Adventure({
+        source: upstreamSource, entry: "InnerSelf", seed: 15, maxChars: 25000
+    });
+    seedAgents(upstreamRun);
+    upstreamRun.hook("input", "> You meet Leah.");
+    upstreamRun.push("> You meet Leah.", "do");
+    upstreamRun.hook("context", buildContext(upstreamRun));
+    upstreamRun.push("Leah looks up.", "continue");
+    upstreamRun.state.InnerSelf.agent = "Leah";
+    const prose = "Leah set about her task without another word.";
+    const out = stripZW(upstreamRun.hook("output", `(courier_debt = \`I counted them.\`) ${prose}`)).trim();
+    assert(
+        !out.includes("task"),
+        "upstream no longer deletes this line, so Chronicle's sanitizer change is no longer a fix"
+    );
+});
+
+test("leaked prompt text is still caught", () => {
+    const adventure = armed(16, "Iris");
+    const leaks = [
+        "<SYSTEM>",
+        "# STRICT OUTPUT FORMAT",
+        "## SHORT TASK (REQUIRED)",
+        "## STORY CONTINUATION (REQUIRED)",
+        "(any_key_name = `One thought sentence.`)",
+        "(delete key_name_to_forget)",
+        "Story continues from Iris's second person perspective...",
+        "- key_name_to_forget must be an existing key in Leah's brain",
+        "NO EXTRA TEXT ANYWHERE.",
+        "THE FIRST CHAR OF THE WHOLE OUTPUT MUST BE \"(\".",
+        "user:",
+        "You are Iris."
+    ];
+    const survived = [];
+    for (const leak of leaks) {
+        adventure.state.InnerSelf.agent = "Leah";
+        const out = stripZW(adventure.hook("output", `${leak}\nShe reached for the lamp.`));
+        adventure.push(out, "continue");
+        if (out.includes(leak.slice(0, 18))) {
+            survived.push(leak);
+        }
+    }
+    assertEqual(survived.length, 0, `leaked prompt text reached the story: ${JSON.stringify(survived)}`);
+});
+
+test("shouted dialogue is not mistaken for a leaked instruction", () => {
+    const adventure = armed(17);
+    const shout = "GET OUT OF MY HOUSE, she screamed at him.";
+    adventure.state.InnerSelf.agent = "Leah";
+    const out = stripZW(adventure.hook("output", `(courier_debt = \`I counted them.\`) ${shout}`));
+    assert(out.includes(shout), "shouted dialogue was deleted as if it were a prompt header");
+});
+
+// ---------------------------------------------------------------- 26. reported from play
+
+suite("26. Bugs reported from a live adventure");
+
+test("/diag names every setting the profile overruled, and by how much", () => {
+    const { adventure, session } = moduleAdventure(
+        { ensemble: "true", brains: "3", audit: "true", auditEvery: "75", world: "true", consoleOn: "true" },
+        { maxChars: 25000 }
+    );
+    session.play("> You work with Leah.", "do");
+    adventure.hook("input", "/diag");
+    const report = String(adventure.sandbox.state.message);
+    assert(/Overruled by profile S:/.test(report), `no override line in /diag:\n${report}`);
+    assert(/brains 1 \(you set 3\)/.test(report), `the brain cap was not explained:\n${report}`);
+    assert(/audits every 150 \(you set 75\)/.test(report), `the audit floor was not explained:\n${report}`);
+    // And at a context where nothing is capped, it says so rather than staying silent
+    const roomy = moduleAdventure(
+        { ensemble: "true", brains: "3", consoleOn: "true" }, { maxChars: 150000 }
+    );
+    roomy.session.play("> You work with Leah.", "do");
+    roomy.adventure.hook("input", "/diag");
+    assert(
+        /Overruled by profile L: nothing/.test(String(roomy.adventure.sandbox.state.message)),
+        "a profile that caps nothing should say so"
+    );
+});
+
+test("the calendar understands travel, not only sleep", () => {
+    const { adventure, session } = moduleAdventure({ world: "true", consoleOn: "true" }, { maxChars: 150000 });
+    const day = () => adventure.state.CHRONICLE.world.day;
+    const settle = () => session.play("> You look about with Leah.", "do");
+    for (const [prose, expected] of [
+        ["You set off for the guild at first light, with Leah beside you.", 1],
+        ["The journey to Lumenfall took three days, and Leah counted every one.", 3],
+        ["You travel south for two weeks with Leah, and the road is long.", 14],
+        ["After a day on the road, Leah sees the walls come into sight.", 1]
+    ]) {
+        const before = day();
+        session.force(prose);
+        session.play("> You ride out.", "do");
+        settle();
+        assertEqual(
+            day() - before, expected,
+            `"${prose.slice(0, 40)}..." advanced ${day() - before} days, expected ${expected}`
+        );
+    }
+    // And ordinary prose does not move the calendar at all
+    for (const prose of [
+        "She set the ledger down and said nothing to Leah.",
+        "Leah rode him hard about the manifest, and he would not answer."
+    ]) {
+        const before = day();
+        session.force(prose);
+        session.play("> You wait.", "do");
+        settle();
+        assertEqual(day(), before, `"${prose.slice(0, 40)}..." moved the calendar and should not have`);
+    }
+});
+
+test("time passes on turns where nobody was asked to think", () => {
+    // The reported symptom: the date never advanced. Module scans used to sit behind an
+    // early return that fires whenever no character formed a thought, which is most turns
+    const { adventure, session } = moduleAdventure({ world: "true" }, { maxChars: 150000 });
+    editSetting(adventure, ROWS.chance, "0%");
+    session.play("> You set out with Leah.", "do");
+    const before = adventure.state.CHRONICLE.world.day;
+    session.force("You set off for the capital, and after three weeks on the road you arrive.");
+    session.play("> You ride out.", "do");
+    const staged = adventure.state.CHRONICLE.pending;
+    assert(staged, "a quiet turn staged nothing at all");
+    assert(
+        staged.ops.some(op => (op.mod === "world") && (op.op === "advanceDays")),
+        `a quiet turn did not stage the time that passed: ${JSON.stringify(staged.ops)}`
+    );
+    assertEqual(staged.agent, "", "a world-only transaction should belong to no character");
+    session.play("> You look about.", "do");
+    assertEqual(
+        adventure.state.CHRONICLE.world.day - before, 21,
+        "the calendar did not move on a turn where nobody thought"
+    );
+});
+
+test("the calendar carries a season and a year, not just a day", () => {
+    const { adventure, session } = moduleAdventure({ world: "true", consoleOn: "true" }, { maxChars: 150000 });
+    session.play("> You look around with Leah.", "do");
+    const card = cardTitled(adventure, "Chronicle");
+    assert(card, "no world card");
+    assert(/Season length: 91/.test(card.description), `no season length on the card:\n${card.description}`);
+    assert(/Seasons: Spring; Summer; Autumn; Winter/.test(card.description), "no seasons on the card");
+    // The injected block states it
+    const step = session.play("> You walk on with Leah.", "do");
+    assert(
+        /- Date: [^\n]*Spring, year 1/.test(step.contextOut[0]),
+        `the season and year were not injected:\n${(step.contextOut[0].match(/- Date: [^\n]*/) || ["(no date line)"])[0]}`
+    );
+    // A player who writes their own calendar is obeyed
+    card.description = card.description
+        .replace(/^Season length:.*$/m, "Season length: 30")
+        .replace(/^Seasons:.*$/m, "Seasons: Thaw; High Sun; Harvest; Dark");
+    // One advance per turn: the first phrase that matches wins, by design
+    session.force("You travel south for two weeks with Leah, and the road is long.");
+    session.play("> You ride out.", "do");
+    session.play("> You arrive.", "do");
+    adventure.hook("input", "/state");
+    const state = String(adventure.sandbox.state.message);
+    assert(/day 15/.test(state), `the day did not advance as expected:\n${state}`);
+    assert(/Thaw/.test(state), `the player's own season names were ignored:\n${state}`);
+    // Long enough to roll the year over
+    adventure.state.CHRONICLE.world.day = 121;
+    adventure.hook("input", "/state");
+    assert(
+        /year 2/.test(String(adventure.sandbox.state.message)),
+        `the year did not roll over: ${String(adventure.sandbox.state.message).split("\n")[0]}`
+    );
+});
+
+test("an empty seasons row on the card does not delete the calendar", () => {
+    const { adventure, session } = moduleAdventure({ world: "true", consoleOn: "true" }, { maxChars: 150000 });
+    session.play("> You look around with Leah.", "do");
+    const card = cardTitled(adventure, "Chronicle");
+    card.description = card.description.replace(/^Seasons:.*$/m, "Seasons: ");
+    session.play("> You walk on with Leah.", "do");
+    adventure.hook("input", "/state");
+    assert(
+        /Spring/.test(String(adventure.sandbox.state.message)),
+        "clearing the seasons row left the calendar with no seasons at all"
+    );
+});
+
 // ---------------------------------------------------------------- report
 
 const failed = results.filter(r => !r.ok);
