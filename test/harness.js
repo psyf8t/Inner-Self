@@ -130,8 +130,19 @@ function seedAgents(adventure) {
     }
 }
 
+/** Every card Chronicle uses for settings, base first */
+function configCards(adventure) {
+    return adventure.storyCards.filter(c => /^Configure/.test((c.title || "").trim()));
+}
+
+/** The base card: the one that is not a module card */
 function configCard(adventure) {
-    return adventure.storyCards.find(c => /^Configure/.test((c.title || "").trim()));
+    return configCards(adventure).find(c => !/Modules/.test(c.title || ""));
+}
+
+/** The module cards, in order */
+function moduleCards(adventure) {
+    return configCards(adventure).filter(c => /Modules/.test(c.title || ""));
 }
 
 /**
@@ -142,16 +153,16 @@ function configCard(adventure) {
  * @returns {void}
  */
 function editSetting(adventure, label, value) {
-    const card = configCard(adventure);
-    assert(card, "no config card to edit");
     let hit = false;
-    card.entry = card.entry.split("\n").map(line => {
-        if (!label.test(line)) {
-            return line;
-        }
-        hit = true;
-        return `${line.slice(0, line.indexOf(":"))}: ${value}`;
-    }).join("\n");
+    for (const card of configCards(adventure)) {
+        card.entry = card.entry.split("\n").map(line => {
+            if (!label.test(line)) {
+                return line;
+            }
+            hit = true;
+            return `${line.slice(0, line.indexOf(":"))}: ${value}`;
+        }).join("\n");
+    }
     assert(hit, `config row not found for ${label}`);
 }
 
@@ -168,9 +179,13 @@ const ROWS = {
 
 /** Everything the config card claims, as a plain map, for comparing across versions */
 function readSettings(adventure) {
-    const card = configCard(adventure);
     const out = {};
-    for (const line of `${card.entry}\n${card.description}`.split("\n")) {
+    // Notes explain every row and entries carry the values, so entries are read last and win
+    const text = [
+        configCard(adventure).description,
+        ...configCards(adventure).map(card => card.entry)
+    ].join("\n");
+    for (const line of text.split("\n")) {
         const match = line.match(/^>\s*([^:]+):\s*(.*)$/);
         if (match) {
             // Row labels differ by product name, so key on the tail of the label
@@ -415,8 +430,14 @@ const migration = (() => {
 })();
 
 test("the Inner Self config card is migrated, not duplicated", () => {
-    const configs = migration.chronicle.storyCards.filter(c => /^Configure/.test((c.title || "").trim()));
-    assertEqual(configs.length, 1, `expected one config card, found ${configs.length}`);
+    const configs = migration.chronicle.storyCards
+        .filter(c => /^Configure/.test((c.title || "").trim()) && !/Modules/.test(c.title || ""));
+    assertEqual(configs.length, 1, `expected one base config card, found ${configs.length}`);
+    // and the settings are split across a base card and its module cards
+    assert(
+        0 < moduleCards(migration.chronicle).length,
+        "the module card was not created during migration"
+    );
     assert(
         configs[0].title.includes("Chronicle"),
         `config card kept the old title: ${JSON.stringify(configs[0].title)}`
@@ -496,21 +517,25 @@ test("rolling back leaves the renamed config card behind, as MIGRATION.md warns"
     upstream.sandbox.storyCards = saved.cards.map((c, i) => ({ id: `rolled-${i}`, ...c }));
     upstream.sandbox.history = saved.history.map(a => ({ ...a }));
     new Session([upstream], { seed: 24 }).play("> You keep going.", "do");
-    const configs = upstream.storyCards.filter(c => /^Configure/.test((c.title || "").trim()));
-    assertEqual(configs.length, 2, `expected the documented orphan, found ${configs.length} config cards`);
+    const configs = upstream.storyCards
+        .filter(c => /^Configure/.test((c.title || "").trim()) && !/Modules/.test(c.title || ""));
+    assertEqual(configs.length, 2, `expected the documented orphan, found ${configs.length} base config cards`);
     // And the documented workaround works: retitle first, then roll back
     const fixed = newAdventure("upstream");
     fixed.sandbox.state = JSON.parse(JSON.stringify(saved.state));
     fixed.sandbox.storyCards = saved.cards.map((c, i) => ({
         id: `fixed-${i}`, ...c,
-        title: /^Configure/.test((c.title || "").trim()) ? "Configure \nInner Self" : c.title
+        title: (/^Configure/.test((c.title || "").trim()) && !/Modules/.test(c.title || ""))
+            ? "Configure \nInner Self"
+            : c.title
     }));
     fixed.sandbox.history = saved.history.map(a => ({ ...a }));
     new Session([fixed], { seed: 25 }).play("> You keep going.", "do");
-    const fixedConfigs = fixed.storyCards.filter(c => /^Configure/.test((c.title || "").trim()));
+    const fixedConfigs = fixed.storyCards
+        .filter(c => /^Configure/.test((c.title || "").trim()) && !/Modules/.test(c.title || ""));
     assertEqual(fixedConfigs.length, 1, "the retitle workaround did not work");
-    assert(
-        readSettings(fixed)["max brain size relative to story context"] === "44%",
+    assertEqual(
+        readSettings(fixed)["max brain size relative to story context"], "44%",
         "the retitle workaround lost a setting"
     );
 });
@@ -917,10 +942,16 @@ function moduleAdventure(settings = {}, options = {}) {
     editSetting(adventure, ROWS.chance, "100%");
     editSetting(adventure, ROWS.half, "false");
     editSetting(adventure, ROWS.player, "\"Iris\"");
-    for (const [key, value] of Object.entries(settings)) {
+    // Toggles first: a module's detail rows are only emitted once it is switched on
+    const entries = Object.entries(settings);
+    for (const [key, value] of entries.filter(([, value]) => /^(?:true|false)$/.test(value))) {
         editSetting(adventure, MODULE_ROWS[key], value);
     }
     session.play("> You open the ledger with Leah.", "do");
+    for (const [key, value] of entries.filter(([, value]) => !/^(?:true|false)$/.test(value))) {
+        editSetting(adventure, MODULE_ROWS[key], value);
+    }
+    session.play("> You read the ledger with Leah.", "do");
     return { adventure, session };
 }
 
@@ -986,20 +1017,33 @@ test("an explicit request to delete a pinned thought is refused and logged", () 
 test("eviction takes the coldest working thought, not a core one", () => {
     const { adventure, session } = moduleAdventure({ tiers: "true", brainChars: "500" });
     session.play("> You review the crates with Leah.", "do");
-    const card = brainCardOf(adventure, "Leah");
-    card.description = [
-        "#core_identity: 1 → I am the guild's factor and I answer to no captain.",
-        "cold_thought: 2 → I noticed the third crate was lighter than its manifest.",
-        "warm_thought: 3 → I intend to ask Silas about the third crate tonight."
-    ].join("\n\n");
+    for (const who of AGENTS) {
+        const card = brainCardOf(adventure, who) || (() => {
+            adventure.storyCards.push({
+                id: `brain-${who}`, keys: JSON.stringify({ agent: who }), entry: "",
+                type: "Brain", title: who, description: ""
+            });
+            return brainCardOf(adventure, who);
+        })();
+        card.description = [
+            `#core_identity: 1 → I am ${who}, the guild's factor, and I answer to no captain.`,
+            `cold_thought: 2 → I noticed the third crate was lighter than its manifest, ${"and I said nothing about it to anyone at the wharf, ".repeat(4)}and I have not forgotten.`,
+            `warm_thought: 3 → I intend to ask Silas about the third crate tonight, ${"and to watch his hands rather than his face while he answers, ".repeat(4)}before the tide turns.`
+        ].join("\n\n");
+    }
     for (let i = 0; i < 8; i++) {
         session.play(`> You and Leah count crate ${i}.`, "do");
     }
-    const after = brainCardOf(adventure, "Leah");
-    assert(after.description.includes("#core_identity"), "the core thought was evicted");
+    // Whoever the scene triggered is who did the thinking, so check them all
+    const brains = AGENTS.map(who => brainCardOf(adventure, who)).filter(Boolean);
+    for (const brain of brains) {
+        assert(brain.description.includes("#core_identity"), "a core thought was evicted");
+    }
     assert(
-        adventure.state.CHRONICLE.journal.some(entry => (entry.kind === "evict")),
-        "nothing was ever evicted despite a 500 char cap"
+        brains.some(brain => (
+            !brain.description.includes("cold_thought") || !brain.description.includes("warm_thought")
+        )),
+        "no seeded working thought was ever evicted despite a 500 char cap"
     );
 });
 
@@ -1364,27 +1408,34 @@ test("a bond advances one rung at a time and respects its cooldown", () => {
     session.force("(bond = `formally bound`) Leah looks at Iris for a long moment.");
     session.play("> You offer your hand.", "do");
     session.play("> You wait.", "do");
+    const moved = Object.entries(adventure.state.CHRONICLE.bonds).filter(([, b]) => (0 < b.stage));
+    assertEqual(moved.length, 1, `expected one standing to move: ${JSON.stringify(adventure.state.CHRONICLE.bonds)}`);
+    const [who] = moved[0];
     assertEqual(
-        adventure.state.CHRONICLE.bonds.Leah.stage, 1,
-        `a bond skipped rungs: ${JSON.stringify(adventure.state.CHRONICLE.bonds.Leah)}`
+        adventure.state.CHRONICLE.bonds[who].stage, 1,
+        `a bond skipped rungs: ${JSON.stringify(adventure.state.CHRONICLE.bonds[who])}`
     );
     // With a cooldown in force, the next advance must not land
     editSetting(adventure, MODULE_ROWS.bondTurns, "500");
-    session.force("(bond = `sought out`) Leah steps closer.");
-    session.play("> You speak gently.", "do");
-    session.play("> You wait again.", "do");
-    assertEqual(adventure.state.CHRONICLE.bonds.Leah.stage, 1, "the cooldown was ignored");
+    session.force(`(bond = \`sought out\`) ${who} steps closer.`);
+    session.play(`> You speak gently to ${who}.`, "do");
+    session.play(`> You wait again with ${who}.`, "do");
+    assertEqual(adventure.state.CHRONICLE.bonds[who].stage, 1, "the cooldown was ignored");
 });
 
 test("a betrayal may drop several rungs at once", () => {
     const { adventure, session } = moduleAdventure({ bonds: "true", bondTurns: "0" });
-    adventure.state.CHRONICLE.bonds.Leah = { stage: 5, turn: 0 };
+    // Every character starts high, so whichever one the scene triggers has something to lose
+    for (const who of AGENTS) {
+        adventure.state.CHRONICLE.bonds[who] = { stage: 5, turn: 0 };
+    }
     session.force("(bond = `broken`) Leah turns away without a word.");
     session.play("> You lie to her.", "do");
     session.play("> You watch her go.", "do");
-    assert(
-        adventure.state.CHRONICLE.bonds.Leah.stage < 5,
-        `a betrayal did not cost anything: ${JSON.stringify(adventure.state.CHRONICLE.bonds.Leah)}`
+    const dropped = Object.entries(adventure.state.CHRONICLE.bonds).filter(([, b]) => (b.stage < 5));
+    assertEqual(
+        dropped.length, 1,
+        `a betrayal did not cost anything: ${JSON.stringify(adventure.state.CHRONICLE.bonds)}`
     );
 });
 
@@ -1501,8 +1552,10 @@ test("a bond is mirrored into the reserved namespace, and a hand edit wins", () 
     session.force("(bond = `noticed`) Leah looks up as Iris passes.");
     session.play("> You pass her desk.", "do");
     session.play("> You look back.", "do");
-    const card = brainCardOf(adventure, "Leah");
-    assert(card, "no brain card");
+    const [who] = Object.entries(adventure.state.CHRONICLE.bonds).find(([, b]) => (0 < b.stage)) || [];
+    assert(who, `no standing moved: ${JSON.stringify(adventure.state.CHRONICLE.bonds)}`);
+    const card = brainCardOf(adventure, who);
+    assert(card, `no brain card for ${who}`);
     assert(
         /#bond: standing with the player: noticed/.test(card.description),
         `the bond was not mirrored onto the card:\n${card.description.slice(0, 300)}`
@@ -1512,11 +1565,11 @@ test("a bond is mirrored into the reserved namespace, and a hand edit wins", () 
         /#bond: standing with the player: [a-z ]+/,
         "#bond: standing with the player: defended publicly"
     );
-    session.play("> You speak with Leah.", "do");
-    session.play("> You wait with Leah.", "do");
+    session.play(`> You speak with ${who}.`, "do");
+    session.play(`> You wait with ${who}.`, "do");
     assertEqual(
-        adventure.state.CHRONICLE.bonds.Leah.stage, 4,
-        `the hand edit did not win: ${JSON.stringify(adventure.state.CHRONICLE.bonds.Leah)}`
+        adventure.state.CHRONICLE.bonds[who].stage, 4,
+        `the hand edit did not win: ${JSON.stringify(adventure.state.CHRONICLE.bonds[who])}`
     );
 });
 
@@ -2048,8 +2101,8 @@ const cardRows = (text = "") => Object.fromEntries(
         .map(pair => [cardKey(pair[0]), { label: pair[0].trim(), value: pair[1].trimEnd() }])
 );
 
-/** The card the generator emits from a cold start */
-function generatedCard(agents = []) {
+/** Every config card the generator emits from a cold start */
+function generatedCards(agents = []) {
     const adventure = newAdventure("chronicle");
     for (const name of agents) {
         adventure.storyCards.push({
@@ -2058,99 +2111,162 @@ function generatedCard(agents = []) {
         });
     }
     adventure.hook("context", "Recent Story:\nnothing yet.");
-    return configCard(adventure);
+    return configCards(adventure);
 }
 
 const REFERENCE = JSON.parse(
     fs.readFileSync(path.join(ROOT, "docs", "configure-chronicle.card.json"), "utf8")
-)[0];
+);
 
-test("the committed reference card is exactly what the generator emits", () => {
-    // The agent list is per scenario, so it is compared separately below
-    const agents = (REFERENCE.description.match(/^[A-Za-z][A-Za-z' -]*$/gm) || [])
-        .map(line => line.trim()).filter(line => (line !== ""));
-    const fresh = generatedCard(agents);
-    assertEqual(fresh.title, REFERENCE.title, "card title drifted");
-    assertEqual(fresh.type, REFERENCE.type, "card type drifted");
-    assertEqual(fresh.keys, REFERENCE.keys, "card keys drifted");
-    assertEqual(
-        fresh.entry, REFERENCE.value,
-        "docs/configure-chronicle.card.json is stale; regenerate it from the generator"
-    );
-    // The generator walks story cards in reverse, so re-seeding from the reference list
-    // inverts the order. Trigger priority is a per-scenario choice; what must not drift is
-    // the prose and the cast
+test("the committed reference cards are exactly what the generator emits", () => {
     const marker = "trigger priority:";
-    assertEqual(
-        fresh.description.slice(0, fresh.description.indexOf(marker) + marker.length),
-        REFERENCE.description.slice(0, REFERENCE.description.indexOf(marker) + marker.length),
-        "the reference card's notes are stale; regenerate them from the generator"
-    );
-    const names = (text) => (text.slice(text.indexOf(marker)).match(/^[A-Za-z][A-Za-z' -]*$/gm) || [])
-        .map(line => line.trim()).filter(line => (line !== "")).sort();
-    assertDeep(names(fresh.description), names(REFERENCE.description), "the reference cast drifted");
+    const agents = (REFERENCE[0].description.slice(REFERENCE[0].description.indexOf(marker))
+        .match(/^[A-Za-z][A-Za-z' -]*$/gm) || []).map(l => l.trim()).filter(l => (l !== ""));
+    const fresh = generatedCards(agents);
+    assertEqual(fresh.length, REFERENCE.length, "the number of config cards drifted");
+    for (const [index, card] of fresh.entries()) {
+        const want = REFERENCE[index];
+        assertEqual(card.title, want.title, `card ${index} title drifted`);
+        assertEqual(card.type, want.type, `card ${index} type drifted`);
+        assertEqual(card.keys, want.keys, `card ${index} keys drifted`);
+        assertEqual(
+            card.entry, want.value,
+            `docs/configure-chronicle.card.json is stale for ${card.title}; regenerate it`
+        );
+        // The agent list order depends on card order, so prose is compared exactly and the
+        // cast as a set
+        const cut = (text) => (text.includes(marker)
+            ? text.slice(0, text.indexOf(marker) + marker.length) : text);
+        assertEqual(cut(card.description), cut(want.description), `card ${index} notes drifted`);
+        const names = (text) => (text.slice(text.indexOf(marker)).match(/^[A-Za-z][A-Za-z' -]*$/gm) || [])
+            .map(l => l.trim()).filter(l => (l !== "")).sort();
+        assertDeep(names(card.description), names(want.description), `card ${index} cast drifted`);
+    }
 });
 
-test("every setting the generator emits is a setting the parser reads back", () => {
-    // This is the check that would have caught a hand-written card whose labels look right
-    // but simplify differently: set a distinctive value on every row, then read it back
+test("every setting the generator emits is one the parser reads back", () => {
+    // The check that would have caught a card whose labels look right but simplify
+    // differently. Two rounds, because switching a module on reveals rows that were not
+    // there to flip in the first round
     const adventure = newAdventure("chronicle");
     adventure.hook("context", "Recent Story:\nnothing yet.");
-    const card = configCard(adventure);
-    const emitted = cardRows(card.entry);
-    const settable = Object.entries(emitted).filter(([, row]) => (
-        // Prose rows have no value to set
-        /^(?:true|false|"[^"]*"|\d+%?|\d+(?:st|nd|rd)|"?[^"]*"?)$/.test(row.value) && (row.value !== "")
-    ));
-    assert(30 < settable.length, `only ${settable.length} settable rows found`);
-    // Flip every boolean and bump every integer, then check the script agrees
-    const flipped = {};
-    card.entry = card.entry.split("\n").map(line => {
-        const match = line.match(/^>\s*([^:]+):\s*(.*)$/);
-        if (!match) {
-            return line;
+    const flipBooleans = () => {
+        const asked = {};
+        for (const card of configCards(adventure)) {
+            card.entry = card.entry.split("\n").map(line => {
+                const match = line.match(/^>\s*([^:]+):\s*(true|false)\s*$/);
+                if (!match) {
+                    return line;
+                }
+                asked[cardKey(match[1])] = "true";
+                return `> ${match[1]}: true`;
+            }).join("\n");
         }
-        const [, label, value] = match;
-        if (value === "true") {
-            flipped[cardKey(label)] = "false";
-        } else if (value === "false") {
-            flipped[cardKey(label)] = "true";
-        } else if (/^\d+%$/.test(value)) {
-            flipped[cardKey(label)] = `${Math.max(1, parseInt(value, 10) - 1)}%`;
-        } else if (/^\d+$/.test(value)) {
-            flipped[cardKey(label)] = String(Math.max(1, parseInt(value, 10) - 1));
-        } else {
-            return line;
+        return asked;
+    };
+    const bumpNumbers = () => {
+        const asked = {};
+        for (const card of configCards(adventure)) {
+            card.entry = card.entry.split("\n").map(line => {
+                const match = line.match(/^>\s*([^:]+):\s*(\d+)(%?)\s*$/);
+                if (!match) {
+                    return line;
+                }
+                const value = `${Math.max(1, parseInt(match[2], 10) - 1)}${match[3]}`;
+                asked[cardKey(match[1])] = value;
+                return `> ${match[1]}: ${value}`;
+            }).join("\n");
         }
-        return `> ${label}: ${flipped[cardKey(label)]}`;
-    }).join("\n");
+        return asked;
+    };
+    const readBack = () => cardRows(configCards(adventure).map(c => c.entry).join("\n"));
+    const check = (asked, label) => {
+        const ignored = Object.entries(asked)
+            .filter(([key, want]) => {
+                const row = readBack()[key];
+                return (!row || (row.value !== want));
+            })
+            .map(([key, want]) => `${key}: wanted ${want}, got ${readBack()[key] ? readBack()[key].value : "(row gone)"}`);
+        assertEqual(
+            ignored.length, 0,
+            `${label}: these rows are decorative, the parser does not read them:\n  ${ignored.join("\n  ")}`
+        );
+    };
+    const booleans = flipBooleans();
     adventure.hook("context", "Recent Story:\nnothing yet.");
-    const after = cardRows(configCard(adventure).entry);
-    const ignored = [];
-    for (const [key, want] of Object.entries(flipped)) {
-        if (!after[key] || (after[key].value !== want)) {
-            ignored.push(`${after[key] ? after[key].label : key}: wanted ${want}, got ${after[key] ? after[key].value : "(row gone)"}`);
-        }
-    }
-    assertEqual(
-        ignored.length, 0,
-        `these rows are decorative, the parser does not read them:\n  ${ignored.join("\n  ")}`
-    );
+    assert(10 < Object.keys(booleans).length, `only ${Object.keys(booleans).length} boolean rows found`);
+    check(booleans, "booleans");
+    // Every module is on now, so every detail row is visible and can be bumped
+    const numbers = bumpNumbers();
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    assert(12 < Object.keys(numbers).length, `only ${Object.keys(numbers).length} numeric rows found`);
+    check(numbers, "numbers");
 });
 
 test("a row whose label is reworded stops being read, and the test says so", () => {
     // Proving the check above has teeth, using the exact mistake a hand-written card made
     const adventure = newAdventure("chronicle");
     adventure.hook("context", "Recent Story:\nnothing yet.");
-    const card = configCard(adventure);
-    card.entry = card.entry
-        .replace("> Tiered memory with pinned core thoughts: false", "> [B] Tiered memory with pinned core thoughts: true");
+    for (const card of configCards(adventure)) {
+        card.entry = card.entry.replace(
+            "> Tiered memory with pinned core thoughts: false",
+            "> [B] Tiered memory with pinned core thoughts: true"
+        );
+    }
     adventure.hook("context", "Recent Story:\nnothing yet.");
-    const after = cardRows(configCard(adventure).entry);
+    const after = cardRows(configCards(adventure).map(c => c.entry).join("\n"));
     assertEqual(
         after[cardKey("Tiered memory with pinned core thoughts")].value, "false",
         "a prefixed label was somehow still read, which would make this test useless"
     );
+});
+
+test("entry and notes stay a matched pair", () => {
+    // They are generated from one list of rows, and this fails the build if that stops
+    // being true. Notes document every module row, including ones currently hidden, so the
+    // invariant is: everything in an entry is explained, and every explanation is real
+    const cards = generatedCards();
+    // Notes carry prose as well as row documentation, and prose headers end in a colon
+    // too. These two are headings, not settings, and are named here so that anything else
+    // appearing as an orphan is a real one
+    const PROSE_HEADINGS = new Set([
+        cardKey("What each setting on this card does:"),
+        cardKey("Write the first name of every intelligent story character on separate lines below, listed from highest to lowest trigger priority:")
+    ]);
+    const explained = new Set();
+    for (const card of cards) {
+        for (const line of String(card.description).split("\n")) {
+            const match = line.match(/^>\s*([^:]+):/);
+            if (match && !PROSE_HEADINGS.has(cardKey(match[1]))) {
+                explained.add(cardKey(match[1]));
+            }
+        }
+    }
+    const known = new Set();
+    for (const card of cards) {
+        for (const line of String(card.entry).split("\n")) {
+            const match = line.match(/^>\s*([^:]+):/);
+            if (match) {
+                known.add(cardKey(match[1]));
+            }
+        }
+    }
+    // Turn everything on so the hidden rows become visible, and collect those too
+    const adventure = newAdventure("chronicle");
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    for (const card of configCards(adventure)) {
+        card.entry = card.entry.split("\n")
+            .map(line => line.replace(/:\s*false\s*$/, ": true")).join("\n");
+    }
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    const withEverythingOn = new Set(Object.keys(cardRows(
+        configCards(adventure).map(c => c.entry).join("\n")
+    )));
+    const unexplained = [...withEverythingOn].filter(key => !explained.has(key));
+    const orphaned = [...explained].filter(key => !withEverythingOn.has(key));
+    assertEqual(unexplained.length, 0, `entry rows with no explanation in notes: ${unexplained.join(", ")}`);
+    assertEqual(orphaned.length, 0, `notes explaining rows the generator never emits: ${orphaned.join(", ")}`);
+    assert(known.size < withEverythingOn.size, "turning modules on revealed no extra rows");
 });
 
 suite("22. Modules K and L are not optional");
@@ -2164,7 +2280,7 @@ test("neither switch exists any more, in the panel or on the card", () => {
         !chronicleSource.includes("IS_COMPLIANCE_MONITOR_ENABLED"),
         "the compliance monitor switch is still declared in MainSettings"
     );
-    const card = generatedCard();
+    const card = generatedCards()[1];
     assert(!/Scale injections to the context/.test(card.entry), "the autoscaling row is still emitted");
     assert(!/Watch whether the model can follow/.test(card.entry), "the compliance row is still emitted");
 });
@@ -2229,6 +2345,256 @@ test("a creator panel still declaring the old flags is harmless", () => {
     }
     assertEqual(adventure.throws.length, 0, "an old creator panel threw");
     assertEqual(adventure.state.CHRONICLE.budget.profile, "M", "an old creator panel disabled autoscaling");
+});
+
+// ---------------------------------------------------------------- 23. entry limit
+
+suite("23. Config card entry limit");
+
+/** Chronicle's own budget, mirrored here so the test fails if the code raises it quietly */
+const ENTRY_LIMIT = 1000;
+const ENTRY_BUDGET = ENTRY_LIMIT - 80;
+
+/** Sets every module toggle by a predicate, one render at a time */
+function setToggles(adventure, wanted) {
+    let index = 0;
+    for (const card of configCards(adventure)) {
+        card.entry = card.entry.split("\n").map(line => {
+            const match = line.match(/^>\s*([^:]+):\s*(true|false)\s*$/);
+            if (!match || /^Enable Chronicle$/.test(match[1])) {
+                return line;
+            }
+            return `> ${match[1]}: ${wanted(index++) ? "true" : "false"}`;
+        }).join("\n");
+    }
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+}
+
+test("no card exceeds the limit, with modules off, on, or half on", () => {
+    for (const [label, wanted] of [
+        ["all off", () => false],
+        ["all on", () => true],
+        ["half on", (i) => ((i % 2) === 0)]
+    ]) {
+        const adventure = newAdventure("chronicle");
+        adventure.hook("context", "Recent Story:\nnothing yet.");
+        setToggles(adventure, wanted);
+        // A second pass, because turning a module on reveals rows that then need room
+        setToggles(adventure, wanted);
+        for (const card of configCards(adventure)) {
+            assert(
+                card.entry.length <= ENTRY_BUDGET,
+                `${label}: ${JSON.stringify(card.title)} entry is ${card.entry.length} chars, over the ${ENTRY_BUDGET} budget`
+            );
+            // Nothing was truncated: every line is a whole row
+            for (const line of card.entry.split("\n")) {
+                assert(
+                    /^>\s*[^:]+:\s*\S/.test(line) || (line === ""),
+                    `${label}: ${JSON.stringify(line.slice(-40))} looks truncated`
+                );
+            }
+        }
+    }
+});
+
+test("a module's detail rows appear and disappear with its toggle", () => {
+    const adventure = newAdventure("chronicle");
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    const rows = () => Object.keys(cardRows(configCards(adventure).map(c => c.entry).join("\n")));
+    const detail = cardKey("Maximum characters of thought per brain:");
+    assert(!rows().includes(detail), "a detail row was visible while its module was off");
+    // On
+    editSetting(adventure, MODULE_ROWS.tiers, "true");
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    assert(rows().includes(detail), "a detail row did not appear when its module was switched on");
+    // Set it, and set something on the other card too
+    editSetting(adventure, MODULE_ROWS.brainChars, "9000");
+    editSetting(adventure, ROWS.chance, "42%");
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    // Off again
+    editSetting(adventure, MODULE_ROWS.tiers, "false");
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    assert(!rows().includes(detail), "a detail row survived its module being switched off");
+    // The other card was not disturbed
+    assertEqual(
+        readSettings(adventure)["thought formation chance per turn"], "42%",
+        "toggling a module disturbed a setting on the base card"
+    );
+});
+
+test("an absent detail row reads as its documented default, not as zero or false", () => {
+    const adventure = newAdventure("chronicle");
+    seedAgents(adventure);
+    const session = new Session([adventure], { seed: 44 });
+    session.play("> You begin with Leah.", "do");
+    // Tiered memory off, so none of its detail rows exist anywhere on any card
+    const text = configCards(adventure).map(c => c.entry).join("\n");
+    assert(!/Maximum characters of thought per brain/.test(text), "the row was emitted after all");
+    // Now switch it on without ever supplying a value, and let a transaction capture the
+    // settings the commit will run under
+    editSetting(adventure, MODULE_ROWS.tiers, "true");
+    let staged = null;
+    for (let i = 0; (i < 12) && !staged; i++) {
+        session.play(`> You and Leah count crate ${i}.`, "do");
+        staged = adventure.state.CHRONICLE.pending || adventure.state.CHRONICLE.candidates[0] || null;
+    }
+    assert(staged && staged.cfg, "nothing was staged, so no settings were captured");
+    assertEqual(staged.cfg.brainChars, 4000, "an absent row was not read as its default");
+    assertEqual(staged.cfg.core, 5, "an absent row was not read as its default");
+    assertEqual(staged.cfg.promote, 2, "an absent row was not read as its default");
+    assert(staged.cfg.brainChars !== 0, "an absent row was read as zero");
+});
+
+test("the spill card is created when needed and removed when not", () => {
+    const adventure = newAdventure("chronicle");
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    const spillTitle = () => moduleCards(adventure).map(c => c.title).filter(t => /\(2\)/.test(t));
+    assertEqual(spillTitle().length, 0, "a spill card existed with every module off");
+    setToggles(adventure, () => true);
+    setToggles(adventure, () => true);
+    assertEqual(spillTitle().length, 1, "no spill card appeared with every module on");
+    // A value set on the spill card survives a round trip
+    editSetting(adventure, MODULE_ROWS.lean, "false");
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    assertEqual(
+        readSettings(adventure)["use terse prompts when context or compliance is tight"], "false",
+        "a value set on the spill card was lost"
+    );
+    // And when the modules go away, so does the spill card
+    setToggles(adventure, () => false);
+    setToggles(adventure, () => false);
+    assertEqual(spillTitle().length, 0, "the spill card outlived its rows");
+    assertEqual(adventure.throws.length, 0, "splitting threw");
+});
+
+test("a single oversized legacy card migrates into the split layout with its values", () => {
+    // The layout Chronicle shipped before the split: every row on one card, well over the
+    // entry limit
+    const adventure = newAdventure("chronicle");
+    seedAgents(adventure);
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    const legacyRows = [
+        "> Enable Chronicle: true",
+        "> Show detailed guide: false",
+        "> First name of player character: \"Iris\"",
+        "> Adventure in 1st, 2nd, or 3rd person: 3rd",
+        "> Max brain size relative to story context: 44%",
+        "> Recent turns searched for name triggers: 9",
+        "> Visual indicator of current NPC triggers: \"🧠\"",
+        "> Thought formation chance per turn: 35%",
+        "> Half thought chance for Do/Say/Story: false",
+        "> Brain card notes store brains as JSON: true",
+        "> Enable debug mode to see model tasks: false",
+        "> Pin this config card near the top: true",
+        "> Install Auto-Cards: false",
+        "> Tiered memory with pinned core thoughts: true",
+        "> Maximum pinned core thoughts per character: 7",
+        "> Maximum characters of thought per brain: 6000",
+        "> Story links before a thought becomes long-term: 3",
+        "> Track world state (date, place, arc, factions): true",
+        "> Maximum characters of world state per turn: 900",
+        "> In-game date the adventure began on: \"Harvest Eve\"",
+        "> Maximum days one turn may advance: 14",
+        "> Let several present characters think at once: false",
+        "> Maximum full brains sharing one context: 4",
+        "> Track who witnessed what, and what they still believe: true",
+        "> Maximum characters of witnessed event log: 5000",
+        "> Chance per turn that a secret spreads to someone: 25%",
+        "> Track progress clocks and scheduled consequences: true",
+        "> Run periodic continuity audits: false",
+        "> Turns between continuity audits: 200",
+        "> Enable player commands like /help and /undo: true",
+        "> Track relationship bonds with the player: false",
+        "> Minimum turns between bond advances: 300",
+        "> Enable diagnostics and safety rails: true",
+        "> Milliseconds a hook may spend before skipping extras: 900",
+        "> Maximum characters of saved adventure state: 50000",
+        "> Turns to stop asking after the model cannot answer: 40",
+        "> Check that context injections are landing at all: true",
+        "> Use terse prompts when context or compliance is tight: false"
+    ];
+    // Collapse to one card, the old way, and delete the module cards
+    for (const card of moduleCards(adventure)) {
+        adventure.storyCards.splice(adventure.storyCards.indexOf(card), 1);
+    }
+    const base = configCard(adventure);
+    base.entry = legacyRows.join("\n");
+    assert(ENTRY_BUDGET < base.entry.length, "the legacy fixture is not actually oversized");
+    adventure.hook("context", "Recent Story:\nnothing yet.");
+    // Split, and every value carried over
+    assert(0 < moduleCards(adventure).length, "the legacy card did not split");
+    for (const card of configCards(adventure)) {
+        assert(
+            card.entry.length <= ENTRY_BUDGET,
+            `${JSON.stringify(card.title)} is still ${card.entry.length} chars after migration`
+        );
+    }
+    const after = readSettings(adventure);
+    for (const [label, want] of [
+        ["max brain size relative to story context", "44%"],
+        ["recent turns searched for name triggers", "9"],
+        ["thought formation chance per turn", "35%"],
+        ["brain card notes store brains as JSON".toLowerCase(), "true"],
+        ["maximum pinned core thoughts per character", "7"],
+        ["maximum characters of thought per brain", "6000"],
+        ["in-game date the adventure began on", "\"Harvest Eve\""],
+        ["maximum characters of witnessed event log", "5000"],
+        ["maximum characters of saved adventure state", "50000"],
+        ["turns to stop asking after the model cannot answer", "40"]
+    ]) {
+        assertEqual(after[label], want, `"${label}" was lost migrating off the legacy card`);
+    }
+    // The legacy card also carried values for modules that are switched off. Those rows are
+    // not shown while the module is off, but the values are not lost: switch the module on
+    // and they are still there
+    for (const [row, label, want] of [
+        [MODULE_ROWS.audit, "turns between continuity audits", "200"],
+        [MODULE_ROWS.bonds, "minimum turns between bond advances", "300"]
+    ]) {
+        assertEqual(
+            readSettings(adventure)[label], undefined,
+            `"${label}" is being shown for a module that is switched off`
+        );
+        editSetting(adventure, row, "true");
+        adventure.hook("context", "Recent Story:\nnothing yet.");
+        assertEqual(
+            readSettings(adventure)[label], want,
+            `"${label}" was lost while its module was switched off`
+        );
+    }
+    assertEqual(adventure.throws.length, 0, "migrating the legacy card threw");
+});
+
+suite("24. Script-only cards stay out of the context");
+
+test("Chronicle's own cards carry no trigger keys", () => {
+    const adventure = newAdventure("chronicle", { maxChars: 150000 });
+    seedAgents(adventure);
+    const session = new Session([adventure], { seed: 51 });
+    session.play("> You begin with Leah.", "do");
+    for (const row of [MODULE_ROWS.world, MODULE_ROWS.clocks, MODULE_ROWS.diag, MODULE_ROWS.audit]) {
+        editSetting(adventure, row, "true");
+    }
+    for (let i = 0; i < 6; i++) {
+        session.play(`> You work with Leah, ${i}.`, "do");
+    }
+    session.force("(audit = `No contradictions found.`) Iris walks on.");
+    session.play("> You keep working with Leah.", "do");
+    session.play("> You keep going with Leah.", "do");
+    const owned = ["Chronicle", "Chronicle Clocks", "Chronicle Diagnostics", "Chronicle Continuity Log"];
+    let seen = 0;
+    for (const title of owned) {
+        const card = adventure.storyCards.find(c => (c.title === title));
+        if (!card) {
+            continue;
+        }
+        seen++;
+        assertEqual(
+            card.keys, "",
+            `${title} still has trigger keys, so it competes with the story for context`
+        );
+    }
+    assert(2 < seen, `expected Chronicle's own cards to exist, found ${seen}`);
 });
 
 // ---------------------------------------------------------------- report

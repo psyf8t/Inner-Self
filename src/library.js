@@ -658,6 +658,10 @@ function Chronicle(hook) {
         diag: { hooks: { input: [], context: [], output: [] }, skips: 0, warned: false },
         // Module J: cached story card positions, validated on use
         index: {},
+        // Values for rows the cards are not currently showing, so that switching a module
+        // off and on again, or migrating from an older single card layout, does not quietly
+        // reset a number the player chose
+        settings: {},
         // Module K: the context profile in force, and how it got there
         budget: { profile: "", candidate: "", streak: 0, maxChars: 0, changes: [] },
         // Module L: how well the model has been answering
@@ -846,6 +850,8 @@ function Chronicle(hook) {
          * @returns {Object} Object with builder and setter functions
          */
         const factory = (key = "", setting = null, int = null) => ({
+            // Which config property this row owns, so a module group can read its toggle
+            key,
             // Builds the display string for the config card entry
             builder: (cfg = {}) => ` ${config[key] ?? cfg.setter?.(setting)}${(
                 // Fancy suffix or boring suffix
@@ -890,6 +896,21 @@ function Chronicle(hook) {
             }
         });
         /**
+         * How much a story card entry may hold
+         *
+         * The entry field is the only part of a story card the platform limits. Notes have
+         * no practical ceiling and never reach the model on their own, which is why every
+         * word of explanation lives there and the entry holds nothing but setting rows.
+         * Inner Self trims its own operation log to 2000 for the same reason; this is
+         * deliberately more conservative, and it is the only place the number appears
+         */
+        const ENTRY_LIMIT = 1000;
+        // Room left over for anything the platform appends of its own
+        const ENTRY_MARGIN = 80;
+        const ENTRY_BUDGET = ENTRY_LIMIT - ENTRY_MARGIN;
+        /** The module card, and the stem every spill card is named from */
+        const MODULES_TITLE = "Configure Chronicle \n· Modules";
+        /**
          * Template for building the Chronicle config card
          * Contains all the user-facing text and settings
          * @type {Object}
@@ -898,15 +919,17 @@ function Chronicle(hook) {
             type: "class",
             title: "Configure \nChronicle",
             // The config card entry contains the main settings
+            // The entry field is the only part of a story card the platform limits, and it
+            // holds nothing but setting rows for that reason. Every word of explanation
+            // lives in the notes below, which the script reads directly and which the model
+            // never sees
             entry: [
-                {
-                    message: "Chronicle grants story characters the ability to learn, plan, and adapt over time, and records every change transactionally so a retry never rewrites the past. Edit the entry and notes below to control how Chronicle behaves."
-                },
-                { message: "Enable Chronicle:", alias: "Enable Inner Self:", ...factory(
+                { message: "Enable Chronicle:", alias: "Enable Inner Self:", help: "Turns the whole system on or off. Off leaves your cards and memories untouched.", ...factory(
                     "allow", S.IS_INNER_SELF_ENABLED_BY_DEFAULT
                 ) },
                 {
                     message: "Show detailed guide:",
+                    help: "Prints the full player guide into the story once, for you to read and erase.",
                     builder: (cfg = {}) => ` ${(
                         ((hook === "context") || Number.isInteger(info.maxChars))
                         ? config.guide ?? cfg.setter?.(false)
@@ -916,6 +939,7 @@ function Chronicle(hook) {
                 },
                 {
                     message: "First name of player character:",
+                    help: "Used to keep the story in your character's perspective, and to name who a bond is with.",
                     builder: (cfg = {}) => ` "${config.player || (() => {
                         const display = cfg.setter?.(S.PREDETERMINED_PLAYER_CHARACTER_NAME);
                         if (config.player === "") {
@@ -935,20 +959,21 @@ function Chronicle(hook) {
                         return config.player || example;
                     }
                 },
-                { message: "Adventure in 1st, 2nd, or 3rd person:", ...factory(
+                { message: "Adventure in 1st, 2nd, or 3rd person:", help: "Which narrative perspective the prompts ask for.", ...factory(
                     "pov", S.FIRST_SECOND_OR_THIRD_PERSON_POV,
                     { lower: 1, upper: 3, suffix: () => ["st", "nd", "rd"][config.pov - 1] ?? "" }
                 ) },
-                { message: "Max brain size relative to story context:", ...factory(
+                { message: "Max brain size relative to story context:", help: "How much of the recent story budget a character's thoughts may occupy.", ...factory(
                     "percent", S.PERCENTAGE_OF_RECENT_STORY_USED_FOR_BRAINS,
                     { lower: 1, upper: 95, suffix: "%" }
                 ) },
-                { message: "Recent turns searched for name triggers:", ...factory(
+                { message: "Recent turns searched for name triggers:", help: "How far back Chronicle looks for a character name before deciding who thinks.", ...factory(
                     "distance", S.NUMBER_OF_ACTIONS_TO_LOOK_BACK_FOR_TRIGGERS,
                     { lower: 1, upper: 250 }
                 ) },
                 {
                     message: "Visual indicator of current NPC triggers:",
+                    help: "Symbol shown beside the card of whoever is thinking. Leave empty to disable.",
                     builder: (cfg = {}) => ` "${(
                         config.indicator ?? cfg.setter?.(S.ACTIVE_CHARACTERS_VISUAL_INDICATOR_SYMBOL)
                     )}"`,
@@ -960,119 +985,162 @@ function Chronicle(hook) {
                         : (config.indicator = fallback.indicator)
                     )
                 },
-                { message: "Thought formation chance per turn:", ...factory(
+                { message: "Thought formation chance per turn:", help: "How often a triggered character is asked to form a thought.", ...factory(
                     "chance", S.THOUGHT_FORMATION_CHANCE_PER_TURN,
                     { lower: 0, upper: 100, suffix: "%" }
                 ) },
-                { message: "Half thought chance for Do/Say/Story:", ...factory(
+                { message: "Half thought chance for Do/Say/Story:", help: "Halves that chance on turns you drove, so your own actions stay yours.", ...factory(
                     "half", S.IS_THOUGHT_CHANCE_HALF_FOR_DO_SAY_STORY
                 ) },
-                { message: "Brain card notes store brains as JSON:", ...factory(
+                { message: "Brain card notes store brains as JSON:", help: "Shows thoughts as raw JSON instead of the friendlier key: value form. Both parse.", ...factory(
                     "json", S.IS_JSON_FORMAT_USED_FOR_BRAIN_CARD_NOTES
                 ) },
-                { message: "Enable debug mode to see model tasks:", ...factory(
+                { message: "Enable debug mode to see model tasks:", help: "Leaves the raw operation text inline in the story, for when you are debugging.", ...factory(
                     "debug", S.IS_DEBUG_MODE_ENABLED_BY_DEFAULT
                 ) },
-                { message: "Pin this config card near the top:", ...factory(
+                { message: "Pin this config card near the top:", help: "Keeps this card high in your story card list.", ...factory(
                     "pin", S.IS_CONFIG_CARD_PINNED_BY_DEFAULT
                 ) },
-                { message: "Install Auto-Cards:", ...factory(
+                { message: "Install Auto-Cards:", help: "Enables the bundled Auto-Cards, which generates story cards as you play.", ...factory(
                     "auto", S.IS_AC_ENABLED_BY_DEFAULT
                 ) },
-                {
-                    message: "Chronicle modules follow. Each one is off until you turn it on, and each is safe to turn off again at any time."
-                },
-                { message: "Tiered memory with pinned core thoughts:", ...factory(
-                    "tiers", S.IS_TIERED_MEMORY_ENABLED
-                ) },
-                { message: "Maximum pinned core thoughts per character:", ...factory(
-                    "core", S.MAX_CORE_THOUGHTS, { lower: 1, upper: 20 }
-                ) },
-                { message: "Maximum characters of thought per brain:", ...factory(
-                    "brainChars", S.MAX_BRAIN_CHARS, { lower: 500, upper: 20000 }
-                ) },
-                { message: "Story links before a thought becomes long-term:", ...factory(
-                    "promote", S.LONG_TERM_PROMOTION_HITS, { lower: 1, upper: 20 }
-                ) },
-                { message: "Track world state (date, place, arc, factions):", ...factory(
-                    "world", S.IS_WORLD_CHRONICLE_ENABLED
-                ) },
-                { message: "Maximum characters of world state per turn:", ...factory(
-                    "worldChars", S.MAX_CHRONICLE_BLOCK_CHARS, { lower: 200, upper: 2000 }
-                ) },
-                {
-                    message: "In-game date the adventure began on:",
-                    builder: (cfg = {}) => ` "${config.startDate ?? cfg.setter?.(S.STARTING_IN_GAME_DATE)}"`,
-                    setter: (value = null, fallible = false) => (
-                        (typeof value === "string")
-                        ? (config.startDate = value.replaceAll("\"", "").trim().slice(0, 60) || fallback.startDate)
-                        : (fallible)
-                        ? null
-                        : (config.startDate = fallback.startDate)
-                    )
-                },
-                { message: "Maximum days one turn may advance:", ...factory(
-                    "maxDays", S.MAX_DAYS_ADVANCED_PER_TURN, { lower: 1, upper: 365 }
-                ) },
-                { message: "Let several present characters think at once:", ...factory(
-                    "ensemble", S.IS_ENSEMBLE_ENABLED
-                ) },
-                { message: "Maximum full brains sharing one context:", ...factory(
-                    "brains", S.MAX_CONCURRENT_BRAINS, { lower: 1, upper: 6 }
-                ) },
-                { message: "Track who witnessed what, and what they still believe:", ...factory(
-                    "knows", S.IS_KNOWLEDGE_MODEL_ENABLED
-                ) },
-                { message: "Maximum characters of witnessed event log:", ...factory(
-                    "eventChars", S.MAX_EVENT_LOG_CHARS, { lower: 500, upper: 20000 }
-                ) },
-                { message: "Chance per turn that a secret spreads to someone:", ...factory(
-                    "rumor", S.RUMOR_SPREAD_PERCENT_PER_TURN, { lower: 0, upper: 100, suffix: "%" }
-                ) },
-                { message: "Track progress clocks and scheduled consequences:", ...factory(
-                    "clocks", S.IS_CLOCKS_ENABLED
-                ) },
-                { message: "Run periodic continuity audits:", ...factory(
-                    "audit", S.IS_CONTINUITY_AUDITOR_ENABLED
-                ) },
-                { message: "Turns between continuity audits:", ...factory(
-                    "auditEvery", S.AUDIT_INTERVAL, { lower: 10, upper: 1000 }
-                ) },
-                { message: "Enable player commands like /help and /undo:", ...factory(
-                    "console", S.IS_PLAYER_CONSOLE_ENABLED
-                ) },
-                { message: "Track relationship bonds with the player:", ...factory(
-                    "bonds", S.IS_BONDS_ENABLED
-                ) },
-                { message: "Minimum turns between bond advances:", ...factory(
-                    "bondTurns", S.MIN_TURNS_PER_BOND_STAGE, { lower: 0, upper: 10000 }
-                ) },
-                { message: "Enable diagnostics and safety rails:", ...factory(
-                    "diag", S.IS_DIAGNOSTICS_ENABLED
-                ) },
-                { message: "Milliseconds a hook may spend before skipping extras:", ...factory(
-                    "timeBudget", S.TIME_BUDGET_MS, { lower: 100, upper: 2000 }
-                ) },
-                { message: "Maximum characters of saved adventure state:", ...factory(
-                    "stateChars", S.MAX_STATE_CHARS, { lower: 8000, upper: 200000 }
-                ) },
-                {
-                    message: "Model compatibility. Budget autoscaling and the compliance monitor always run and have no switch here, because a fixed budget cannot meet a context that moves per action, and nothing else notices when a model stops following the operation format. The rest of this group matters most on DeepSeek, Gemma and GLM."
-                },
-                { message: "Turns to stop asking after the model cannot answer:", ...factory(
-                    "cooldown", S.COMPLIANCE_COOLDOWN_TURNS, { lower: 5, upper: 200 }
-                ) },
-                { message: "Check that context injections are landing at all:", ...factory(
-                    "canary", S.IS_INJECTION_CANARY_ENABLED
-                ) },
-                { message: "Use terse prompts when context or compliance is tight:", ...factory(
-                    "lean", S.IS_LEAN_EMISSION_ENABLED
-                ) },
-                {
-                    message: "Write the name(s) of your non-player characters at the very bottom of the \"notes\" section below. This is mandatory because it allows Chronicle to assemble independent minds for the correct individuals."
-                }
             ],
-            // Description section contains info and agent list
+            /**
+             * Module settings, grouped so a module's detail rows can be shown only while
+             * that module is switched on
+             *
+             * The first row of each group is the toggle. Everything after it is detail, and
+             * is emitted only when the toggle reads true. A detail row that is not emitted
+             * is not an error and is not zero: the parser simply never sees it, and the
+             * scenario default applies, which is what the notes document
+             * @type {Object[]}
+             */
+            modules: [
+                { rows: [
+                    { message: "Tiered memory with pinned core thoughts:", help: "Pinned, long-term and working memory tiers. A full brain evicts its coldest working thought instead of asking the model what to burn.", ...factory(
+                        "tiers", S.IS_TIERED_MEMORY_ENABLED
+                    ) },
+                    { message: "Maximum pinned core thoughts per character:", help: "How many thoughts one character may pin. Pin with /pin, or by putting # in front of a key in their notes.", ...factory(
+                        "core", S.MAX_CORE_THOUGHTS, { lower: 1, upper: 20 }
+                    ) },
+                    { message: "Maximum characters of thought per brain:", help: "How large a brain may grow before the coldest working thought is evicted.", ...factory(
+                        "brainChars", S.MAX_BRAIN_CHARS, { lower: 500, upper: 20000 }
+                    ) },
+                    { message: "Story links before a thought becomes long-term:", help: "How many times a thought must surface in the story before eviction can no longer take it.", ...factory(
+                        "promote", S.LONG_TERM_PROMOTION_HITS, { lower: 1, upper: 20 }
+                    ) }
+                ] },
+                { rows: [
+                    { message: "Track world state (date, place, arc, factions):", help: "Keeps a \"Chronicle\" card holding the date, location, arc, standing, debts and threats, and injects a short block of it each turn. Edit that card and Chronicle believes you.", ...factory(
+                        "world", S.IS_WORLD_CHRONICLE_ENABLED
+                    ) },
+                    { message: "Maximum characters of world state per turn:", help: "Ceiling on that block. Whole lines are dropped by priority rather than cut mid sentence.", ...factory(
+                        "worldChars", S.MAX_CHRONICLE_BLOCK_CHARS, { lower: 200, upper: 2000 }
+                    ) },
+                    {
+                        message: "In-game date the adventure began on:",
+                        help: "Where the calendar starts. It moves on narrative phrasing, never once per turn.",
+                        builder: (cfg = {}) => ` "${config.startDate ?? cfg.setter?.(S.STARTING_IN_GAME_DATE)}"`,
+                        setter: (value = null, fallible = false) => (
+                            (typeof value === "string")
+                            ? (config.startDate = value.replaceAll("\"", "").trim().slice(0, 60) || fallback.startDate)
+                            : (fallible)
+                            ? null
+                            : (config.startDate = fallback.startDate)
+                        )
+                    },
+                    { message: "Maximum days one turn may advance:", help: "Cap on a single time skip, unless the text carries an explicit [+n days] marker.", ...factory(
+                        "maxDays", S.MAX_DAYS_ADVANCED_PER_TURN, { lower: 1, upper: 365 }
+                    ) }
+                ] },
+                { rows: [
+                    { message: "Let several present characters think at once:", help: "Characters who act or speak are present; characters merely mentioned are not. Present characters share one context budget. Ask for this last, and only on a large context.", ...factory(
+                        "ensemble", S.IS_ENSEMBLE_ENABLED
+                    ) },
+                    { message: "Maximum full brains sharing one context:", help: "Upper bound on present characters given a full brain. Your live context size may lower it.", ...factory(
+                        "brains", S.MAX_CONCURRENT_BRAINS, { lower: 1, upper: 6 }
+                    ) }
+                ] },
+                { rows: [
+                    { message: "Track who witnessed what, and what they still believe:", help: "Characters are told what they missed, and keep acting on facts that changed while they were away.", ...factory(
+                        "knows", S.IS_KNOWLEDGE_MODEL_ENABLED
+                    ) },
+                    { message: "Maximum characters of witnessed event log:", help: "Byte cap on the record of what happened and who saw it.", ...factory(
+                        "eventChars", S.MAX_EVENT_LOG_CHARS, { lower: 500, upper: 20000 }
+                    ) },
+                    { message: "Chance per turn that a secret spreads to someone:", help: "Base rate at which an unwitnessed fact reaches someone. Sealed facts never move on their own.", ...factory(
+                        "rumor", S.RUMOR_SPREAD_PERCENT_PER_TURN, { lower: 0, upper: 100, suffix: "%" }
+                    ) }
+                ] },
+                { rows: [
+                    { message: "Track progress clocks and scheduled consequences:", help: "Author clocks on the \"Chronicle Clocks\" card. A clock advances only when the trigger phrase you declared appears in the prose, then queues its consequence.", ...factory(
+                        "clocks", S.IS_CLOCKS_ENABLED
+                    ) }
+                ] },
+                { rows: [
+                    { message: "Run periodic continuity audits:", help: "Spends one thought slot checking the scene against the world card, and reports contradictions without ever correcting them.", ...factory(
+                        "audit", S.IS_CONTINUITY_AUDITOR_ENABLED
+                    ) },
+                    { message: "Turns between continuity audits:", help: "How often that happens. Your context size sets a floor this cannot go below.", ...factory(
+                        "auditEvery", S.AUDIT_INTERVAL, { lower: 10, upper: 1000 }
+                    ) }
+                ] },
+                { rows: [
+                    { message: "Enable player commands like /help and /undo:", help: "Turns on the in-game console. Type /help for the list. Commands the platform owns are never registered.", ...factory(
+                        "console", S.IS_PLAYER_CONSOLE_ENABLED
+                    ) }
+                ] },
+                { rows: [
+                    { message: "Track relationship bonds with the player:", help: "Seven rungs, never skipped upward. The standing lives on each character's own card under #bond, and your hand edits win.", ...factory(
+                        "bonds", S.IS_BONDS_ENABLED
+                    ) },
+                    { message: "Minimum turns between bond advances:", help: "Cooldown between one rung and the next. A betrayal may still cost several rungs at once.", ...factory(
+                        "bondTurns", S.MIN_TURNS_PER_BOND_STAGE, { lower: 0, upper: 10000 }
+                    ) }
+                ] },
+                { rows: [
+                    { message: "Enable diagnostics and safety rails:", help: "Watches saved state size and hook time, skips optional work rather than risk a timeout, and keeps a \"Chronicle Diagnostics\" card.", ...factory(
+                        "diag", S.IS_DIAGNOSTICS_ENABLED
+                    ) },
+                    { message: "Milliseconds a hook may spend before skipping extras:", help: "Time budget per hook. The platform's own ceiling is two seconds.", ...factory(
+                        "timeBudget", S.TIME_BUDGET_MS, { lower: 100, upper: 2000 }
+                    ) },
+                    { message: "Maximum characters of saved adventure state:", help: "Chronicle warns at 60% of this and trims at 85%, dropping the most expendable things first.", ...factory(
+                        "stateChars", S.MAX_STATE_CHARS, { lower: 8000, upper: 200000 }
+                    ) }
+                ] },
+                { rows: [
+                    { message: "Check that context injections are landing at all:", help: "Asks the model to begin one reply in twelve with (ok). Three misses and Chronicle falls back to the memory channel and tells you, because that is what Optimized Context does.", ...factory(
+                        "canary", S.IS_INJECTION_CANARY_ENABLED
+                    ) }
+                ] },
+                { rows: [
+                    { message: "Use terse prompts when context or compliance is tight:", help: "One imperative line instead of fifteen, and bare thought lines, on a small context or a struggling model.", ...factory(
+                        "lean", S.IS_LEAN_EMISSION_ENABLED
+                    ) }
+                ] },
+                { rows: [
+                    { message: "Turns to stop asking after the model cannot answer:", help: "The compliance monitor always runs and has no switch. This is how long it waits before trying a model again once it has stopped answering.", ...factory(
+                        "cooldown", S.COMPLIANCE_COOLDOWN_TURNS, { lower: 5, upper: 200 }
+                    ) }
+                ] }
+            ],
+            /**
+             * The module card notes
+             *
+             * Every module row is documented here, including the ones currently hidden,
+             * because a player deciding whether to switch something on needs to know what
+             * it will give them. Entry and notes are generated from one list of rows, so
+             * they cannot drift apart
+             * @returns {string}
+             */
+            moduleNotes: () => [
+                "Chronicle module settings. Each module's detail rows appear in the entry above only while that module is switched on. While it is off, the value documented here applies.",
+                ...template.modules.flatMap(group => group.rows.map(
+                    row => `> ${row.message} ${row.help ?? ""}`
+                ))
+            ].join("\n\n"),
+            // Notes carry every word of explanation, and the agent list
             description: [
                 {
                     message: `Chronicle ${version} is built on ${ancestry} by LewdLeah, used and modified under the MIT licence, with the original copyright retained in the library script. Auto-Cards is bundled unmodified. Please visit @LewdLeah on AI Dungeon through the link above; none of this exists without that work. ❤️`
@@ -1088,6 +1156,14 @@ function Chronicle(hook) {
                 },
                 {
                     message: "Avoid the Atlas and Raven models entirely; they cannot receive anything this script injects. Turn Optimized Context off if your model offers it, or the world simulation is silently discarded. Tuned for DeepSeek V3.2, Dynamic DeepSeek, Gemma 31B, and GLM 5.1."
+                },
+                {
+                    // Every row on this card, explained. The entry field is limited and the
+                    // notes are not, so this is where the words live
+                    message: "What each setting on this card does:",
+                    builder: () => `\n\n${template.entry.map(
+                        row => `> ${row.message} ${row.help ?? ""}`
+                    ).join("\n\n")}`
                 },
                 {
                     // This is where players list their NPCs
@@ -1225,6 +1301,64 @@ function Chronicle(hook) {
             .map(cfg => `> ${cfg.message}${cfg.builder?.(cfg) ?? ""}`)
             .join(delimiter)
         );
+        /** Every row the generator knows about, base and module alike */
+        const everyRow = [...template.entry, ...template.modules.flatMap(group => group.rows)];
+        /**
+         * Renders one row, which also resolves its value: the builder falls back to the
+         * scenario default whenever the card did not carry that row
+         *
+         * Memoized, because a builder may resolve a value as a side effect and must run
+         * exactly once. The player name row is the one that cares: it renders the example
+         * name while filling the config in with "the protagonist"
+         * @param {Object} cfg - Row definition
+         * @returns {string} The "> label: value" line
+         */
+        const rendered = new Map();
+        const render = (cfg = {}) => {
+            if (!rendered.has(cfg)) {
+                rendered.set(cfg, `> ${cfg.message}${cfg.builder?.(cfg) ?? ""}`);
+            }
+            return rendered.get(cfg);
+        };
+        /**
+         * Splits lines into one card's worth and the remainder
+         * Never truncates: a line either fits on this card or moves whole to the next one,
+         * because half a row reads back as a setting the player never chose
+         * @param {string[]} lines
+         * @returns {Array} [kept, remainder]
+         */
+        const pack = (lines = []) => {
+            const kept = [];
+            const rest = [];
+            let size = 0;
+            for (const line of lines) {
+                if ((0 < rest.length) || (ENTRY_BUDGET < (size + line.length + 1))) {
+                    rest.push(line);
+                    continue;
+                }
+                kept.push(line);
+                size += (line.length + 1);
+            }
+            return [kept, rest];
+        };
+        /** Finds one of Chronicle's own config cards by exact title */
+        const byTitle = (title = "") => storyCards.find(card => (
+            card && (typeof card.title === "string") && (card.title === title)
+        )) ?? null;
+        /** The title of the nth module card, the first of which carries no number */
+        const moduleTitle = (n = 0) => ((n === 0) ? MODULES_TITLE : `${MODULES_TITLE} (${n + 1})`);
+        /** Every module card currently in the adventure, in order */
+        const moduleCards = () => {
+            const found = [];
+            for (let n = 0; n < 8; n++) {
+                const card = byTitle(moduleTitle(n));
+                if (!card) {
+                    break;
+                }
+                found.push(card);
+            }
+            return found;
+        };
         if (config.card === null) {
             // If no config card exists, create one and recurse
             addStoryCard(u,
@@ -1238,23 +1372,30 @@ function Chronicle(hook) {
         }
         // Parse existing card content to extract user-modified settings
         // This is where Chronicle reads back what the player has configured
+        // Settings live across several cards now, so every entry is read as one blob. A row
+        // that is absent from all of them is not an error and is not false: the builder
+        // below falls back to the scenario default, which is what the notes document
         // Abomination :3
-        ["entry", "description"].map(source => [source, (
-            (typeof config.card[source] === "string")
+        const readRows = (source = "") => (
+            (typeof source === "string")
             // Split on >, filter for lines with colons, extract key-value pairs
             // Null prototype because these keys come from text the player can edit
-            ? Object.assign(Object.create(null), Object.fromEntries((config.card[source]
+            ? Object.assign(Object.create(null), Object.fromEntries((source
                 .split(/\s*>[\s>]*/)
                 .filter(block => block.includes(":"))
                 .map(block => block.split(/\s*:[\s:]*/, 2))
             ).map(pair => [simplify(pair[0]), pair[1].trimEnd()]))) : Object.create(null)
-        )]).forEach(([source, extractive]) => template[source].forEach(cfg => (
+        );
+        [
+            [everyRow, readRows([config.card, ...moduleCards()].map(card => card.entry).join("\n"))],
+            [template.description, readRows(config.card.description)]
+        ].forEach(([rows, extractive]) => rows.forEach(cfg => (
             // Try to set each config value from extracted content (fallible mode)
             // A renamed row falls back to the label it carried under Inner Self, so an
             // adventure that predates the rename keeps every value the player chose
             cfg.setter?.(extractive[simplify(cfg.message)] ?? (
                 (typeof cfg.alias === "string") ? extractive[simplify(cfg.alias)] : undefined
-            ), true)
+            ) ?? CH.settings[simplify(cfg.message)], true)
         )));
         // Merge all discovered agents: config, brain card metadata, and "@" pending
         config.agents = [...new Set([...(config.agents ?? fallback.agents), ...agents, ...pending])];
@@ -1264,12 +1405,70 @@ function Chronicle(hook) {
             IS.AC.forced = false;
             IS.AC.enabled = true;
         }
+        // Resolve every row, including the ones about to be hidden, so nothing downstream
+        // reads undefined off a module that happens to be switched off, and remember each
+        // value in case the row is not emitted this turn
+        CH.settings = (CH.settings && (typeof CH.settings === "object") && !Array.isArray(CH.settings))
+            ? CH.settings
+            : {};
+        for (const cfg of everyRow) {
+            const line = render(cfg);
+            const value = line.slice(2 + cfg.message.length).trim();
+            if (value !== "") {
+                CH.settings[simplify(cfg.message)] = value.slice(0, 80);
+            }
+        }
+        // Progressive disclosure: a module's detail rows are shown only while it is on
+        const moduleLines = [];
+        for (const group of template.modules) {
+            const shown = (config[group.rows[0].key] === true);
+            for (const [index, cfg] of group.rows.entries()) {
+                if ((index === 0) || shown) {
+                    moduleLines.push(render(cfg));
+                }
+            }
+        }
         // Update the card with the canonical template format so it sticks after the hook ends
+        const [baseLines, baseSpill] = pack(template.entry.map(cfg => render(cfg)));
         config.card.type = template.type;
         config.card.title = template.title;
-        config.card.entry = build(template.entry, "\n");
+        config.card.entry = baseLines.join("\n");
         config.card.description = build(template.description, "\n\n");
         config.card.keys = u;
+        // Lay the module rows out across as many cards as they need, so overflow is not
+        // merely unlikely
+        let remaining = [...baseSpill, ...moduleLines];
+        let index = 0;
+        while ((0 < remaining.length) && (index < 8)) {
+            const [lines, rest] = pack(remaining);
+            const title = moduleTitle(index);
+            const card = byTitle(title) ?? addStoryCard(
+                u, lines.join("\n"), template.type, title, template.moduleNotes(), { returnCard: true }
+            );
+            if (card && (typeof card === "object") && !Array.isArray(card)) {
+                card.type = template.type;
+                card.title = title;
+                card.entry = lines.join("\n");
+                card.description = template.moduleNotes();
+                card.keys = u;
+            }
+            remaining = rest;
+            index++;
+        }
+        // Remove any module card that is no longer needed, so a card the player toggled
+        // away does not linger with stale rows on it
+        for (let n = index; n < 8; n++) {
+            const stale = byTitle(moduleTitle(n));
+            if (!stale) {
+                break;
+            }
+            const at = storyCards.indexOf(stale);
+            if (typeof removeStoryCard === "function") {
+                removeStoryCard(at);
+            } else {
+                storyCards.splice(at, 1);
+            }
+        }
         return config;
     } }
     /**
@@ -2222,27 +2421,42 @@ function Chronicle(hook) {
      * @returns {Object|null} The card, or null if the platform refused to make one
      */
     const ownCard = (title = "", entry = "", description = "") => {
+        /**
+         * Chronicle reads its own cards directly, so they need no trigger keys
+         *
+         * A card with keys can fire on its own title appearing in the prose and spend
+         * context on text only the script reads. The world card was the worst of these: the
+         * script already injects the world block, so firing would have said it twice
+         * @param {Object} card
+         * @returns {Object} the same card
+         */
+        const mute = (card) => {
+            if (card && (typeof card === "object") && (card.keys !== "")) {
+                card.keys = "";
+            }
+            return card;
+        };
         const cached = CH.index[title];
         if (Number.isInteger(cached) && storyCards[cached] && (storyCards[cached].title === title)) {
             CH.diag.hits = (CH.diag.hits || 0) + 1;
-            return storyCards[cached];
+            return mute(storyCards[cached]);
         }
         CH.diag.misses = (CH.diag.misses || 0) + 1;
         for (let i = 0; i < storyCards.length; i++) {
             if (storyCards[i] && (storyCards[i].title === title)) {
                 CH.index[title] = i;
-                return storyCards[i];
+                return mute(storyCards[i]);
             }
         }
-        const built = addStoryCard(title, entry, "Chronicle", title, description, { returnCard: true });
+        const built = addStoryCard("", entry, "Chronicle", title, description, { returnCard: true });
         if (built && (typeof built === "object") && !Array.isArray(built)) {
             CH.index[title] = storyCards.indexOf(built);
-            return built;
+            return mute(built);
         }
         for (let i = 0; i < storyCards.length; i++) {
             if (storyCards[i] && (storyCards[i].title === title)) {
                 CH.index[title] = i;
-                return storyCards[i];
+                return mute(storyCards[i]);
             }
         }
         log(`Chronicle: could not create the ${title} card`);

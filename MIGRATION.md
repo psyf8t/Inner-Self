@@ -48,9 +48,12 @@ context is built.
 
 Nothing is asked of you. On the first turn after the library is replaced:
 
-1. **The config card is migrated in place.** Chronicle looks for its own card title *and* the
-   Inner Self one, so the existing card is found, renamed to "Configure Chronicle", and rewritten
-   with the module rows appended. No second config card is created.
+1. **The config card is migrated in place, and the module rows move to a second card.** Chronicle
+   looks for its own card title *and* the Inner Self one, so your existing card is found, renamed to
+   "Configure Chronicle", and rewritten holding the thirteen base settings. Module toggles go on a
+   new "Configure Chronicle · Modules" card, and a third appears on demand if they outgrow it. This
+   is because a story card entry is limited to roughly a thousand characters and the settings no
+   longer fit on one; the notes, which have no such limit, carry all the explanation.
 2. **Every setting you had chosen is preserved.** Rows are matched by label, and the renamed
    "Enable Inner Self" row is matched by its old label too. Percentages, the player name, the NPC
    list, the indicator symbol, the JSON format toggle: all carried over.
@@ -67,6 +70,14 @@ Nothing is asked of you. On the first turn after the library is replaced:
 
 The harness runs this migration against a save produced by genuinely running upstream Inner Self
 for 40 turns, then asserts the settings, the brains and the label counter all survive.
+
+### If you are coming from a build with one oversized config card
+
+Earlier builds put all thirty-eight setting rows in one entry field, about 2,700 characters, well
+past what a story card entry holds. On first load those rows are read, split across the base and
+module cards, and every value you had set is carried over. Values belonging to a module that is
+switched off are not shown, because that module's detail rows only appear while it is on, but they
+are remembered: switch the module on and your number is still there.
 
 ### If you are coming from a build that had K and L switches
 
@@ -137,8 +148,10 @@ Modules **K** and **L** already run for you, with no switch. Turn on **M and N**
 
 Chronicle stays rollback-safe on purpose. To go back to Inner Self v1.0.2:
 
-1. Retitle the config card to `Configure Inner Self` (with the line break, as it appears in the
-   card list). **Do this first** — see below.
+1. Retitle **only the base card** to `Configure Inner Self` (with the line break, as it appears in
+   the card list). **Do this first**, and do *not* retitle the "· Modules" cards — two cards with
+   the same name and Inner Self keeps the wrong one, taking your base settings with it. Leaving the
+   module cards under their own names is harmless; Inner Self ignores them.
 2. Replace the `Library` tab with the Inner Self v1.0.2 source.
 3. Change the three hook tabs back to `InnerSelf("input")`, `InnerSelf("context")`,
    `InnerSelf("output")`. This is required: the alias lives in the Chronicle library, so once that

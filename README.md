@@ -404,18 +404,28 @@ Setting *names* are unchanged from Inner Self on purpose. If your scenario alrea
 
 ### Editing the config card by hand
 
-Chronicle rewrites the "Configure Chronicle" card every turn from its own template, and reads your
-settings back by matching each row's label after lowercasing it and stripping everything that is not
-a letter. Change a value and it is read; change the *wording* of a label and that row stops being a
+Settings live across two cards: **Configure Chronicle** holds the thirteen base settings, and
+**Configure Chronicle · Modules** holds the module toggles. A module's detail rows appear on the
+second card only while that module is switched on, and a third card appears on demand if the rows
+ever outgrow one. The entry field is the only part of a story card the platform limits, so it carries
+nothing but `> label: value` rows; every word of explanation lives in the notes, which the script
+reads directly and the model never sees.
+
+Chronicle rewrites those cards every turn from its own template, and reads your settings back by
+matching each row's label after lowercasing it and stripping everything that is not a letter. Change a value and it is read; change the *wording* of a label and that row stops being a
 setting and becomes decoration — the script silently keeps the scenario default instead.
 
 So if you hand-author or transplant a config card, the label text on the left of each colon has to
 match the generator exactly. Adding a prefix like `[B]` in front of a row is enough to break it. The
 safest way to get a valid card is to let the script build one, then edit only the values.
 
+Turning a module off hides its detail rows rather than discarding them. Whatever you had set is
+remembered and comes back when you switch the module on again.
+
 A reference copy of exactly what the generator emits lives at
-[`docs/configure-chronicle.card.json`](./docs/configure-chronicle.card.json), and the harness fails if
-the code and that copy ever drift apart, or if any emitted row stops being one the parser reads.
+[`docs/configure-chronicle.card.json`](./docs/configure-chronicle.card.json) — both cards — and the
+harness fails if the code and that copy ever drift apart, if any emitted row stops being one the
+parser reads, if a card outgrows the entry limit, or if entry and notes stop documenting each other.
 
 ### Preparing Scenario NPCs
 To work on its own, provide Chronicle with the names of your scenario's most important NPCs. Chronicle will create a new brain card for each NPC you prepare, after their name appears in the story. (Kinda like story card triggers, if that makes sense!) Brains are created on-demand to avoid overwhelming players.
