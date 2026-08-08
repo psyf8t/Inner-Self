@@ -16,7 +16,7 @@ back if you want to.
 | Retrying or erasing a response discards that response's thought entirely | Players, immediately and for the better |
 | A retried response is asked to form its own thought, where before it was given the brain with no task | Players and models |
 | Brain keys named `__proto__`, `constructor` or `prototype`, or longer than 60 characters, are refused | Only hostile or broken output |
-| The config card is titled "Configure Chronicle" and carries twenty-seven new module rows | Players |
+| The config card is titled "Configure Chronicle" and a second card carries six new module rows | Players |
 | The hook tabs call `Chronicle(...)` | Creators, optionally |
 
 Everything else is unchanged. With every module off, Chronicle produces byte-identical text to
@@ -36,8 +36,8 @@ context is built.
   upstream by design.
 - `state.InnerSelf.hash` is still written, with exactly the value Inner Self would have written,
   but Chronicle never reads it. It exists so a rollback finds sane state.
-- `state.CHRONICLE` is new. With every module off it holds the ledger and its diagnostics, about
-  5 KB after 300 turns. With every module on, about 16 KB, and Module J will keep it under the
+- `state.CHRONICLE` is new. It holds the ledger and its diagnostics: about 7.0 KB after 300 turns
+  with the optional modules off, about 7.7 KB with both on, and Module J will keep it under the
   budget you set.
 - Brain cards are untouched: same `keys` metadata, same `Brain` type, same entry log format, same
   notes format in both the JSON and the friendly style.
@@ -101,21 +101,19 @@ If you have hand-authored a key like that on purpose, rename it before upgrading
 
 ## Turning modules on, mid-adventure
 
-Modules A, K and L have no switch and are already running: the transaction ledger, budget
-autoscaling, and the compliance monitor. Everything below is safe to enable in the middle of a running
-adventure, and safe to disable again. They are independent; enable them one at a time if you want to
-feel what each one does.
+Four modules have no switch and are already running: the transaction ledger (**A**), budget
+autoscaling (**K**), the compliance monitor (**L**) and lean emission (**N**). A fifth, diagnostics
+(**J**), ships switched on but can be switched off. Only the two in the table below start off, and
+both are safe to enable in the middle of a running adventure and safe to disable again.
 
-Two consequences of K running unconditionally, worth knowing before you wonder where a feature went:
-an injection budget you set can be capped by your live context size, and an audit interval below the
-profile's floor is raised to that floor. `/diag` names the profile in force.
+One consequence of K running unconditionally, worth knowing before you wonder where a feature went:
+a world block budget you set can be capped by your live context size. The diagnostics card names the
+profile in force and every setting it overrode.
 
 | Module | What appears when you switch it on | What it costs you |
 |:--|:--|:--|
 | **B** Tiered memory | Keys prefixed `#` are now pinned. Each character gets one pinned fact seeded from their own story card the next time they think | A brain over its character budget starts evicting its coldest working thought. Set the budget high if you would rather it never did |
-| **C** World chronicle | A "Chronicle" card appears, holding the date and the rest. Up to 700 characters are injected each turn | That much of your context. The date starts from the config card's starting date, not from your story so far — set it once by hand or with `/date` |
-| **E** Knowledge model | Characters are told what they missed, and what they still wrongly believe | An event log in state, capped by the setting. Characters will act on stale information on purpose |
-| **J** Diagnostics | A "Chronicle Diagnostics" card appears; the state budget and hook time rails start enforcing | Optional work is skipped when a hook runs long, which is the point |
+| **C** World chronicle | A "Chronicle" card appears, holding the date and the location. One line of about 40 characters is injected each turn | Almost nothing. The date starts from the config card's starting date, not from your story so far — edit the card once by hand to set it |
 
 Switching a module back off stops all of it immediately. Its cards stay where they are, inert, and
 are safe to delete — they will be rebuilt if you switch the module on again. State it wrote stays
@@ -125,8 +123,8 @@ too, ignored, and Module J will trim it if the state budget ever comes under pre
 
 ## What was removed, and what happens to it
 
-Six modules were cut: ensemble, clocks and consequences, the continuity auditor, the player console,
-bonds, and the injection canary. They shared one context budget, one operation queue and one thought
+Seven modules were cut: ensemble, the knowledge model, clocks and consequences, the continuity
+auditor, the player console, bonds, and the injection canary. They shared one context budget, one operation queue and one thought
 slot per turn with everything else, and at a small context most of them could not fit.
 
 Upgrading is automatic and needs nothing from you:
@@ -134,13 +132,25 @@ Upgrading is automatic and needs nothing from you:
 - Their config card rows stop being emitted, so they disappear from the card rather than lingering as
   rows that read as decoration.
 - Their state is deleted once, on the first turn after the upgrade: clock progress, the consequence
-  queue, bond stages, audit findings, console state and canary state.
+  queue, bond stages, audit findings, console state, canary state, the witnessed event log, the fact
+  table and every stale belief.
 - The "Chronicle Clocks" and "Chronicle Continuity Log" cards are removed, once.
 - Anything the canary wrote to `state.memory.frontMemory` is cleared.
 - Bond stages stored on a character's card under `#bond` are left alone. They read as an ordinary
   pinned thought now, and you can delete them by hand or leave them as flavour.
 
-Nothing that survived changes. Brains, the ledger, the world card and the event log carry over exactly.
+The world card is trimmed to the date and the location. Factions, debts, threats and lost memories
+were lists you typed being read back to you, so those rows disappear from the card; whatever you had
+written in them is gone, and a plain story card holds the same text for free if you want it back.
+
+The world row on the config card is renamed from "Track world state (date, place, arc, factions)" to
+"Track the in-game date and location". The old label is still matched, so a save that had it switched
+on stays switched on.
+
+Diagnostics now ships **on**. With the console gone it is the only window into what Chronicle is doing,
+and it costs one story card and no context.
+
+Everything else that survived is unchanged. Brains and the ledger carry over exactly.
 
 The console went with them, so `/diag` and its siblings no longer exist: a command could only end a
 turn by stopping it, which surfaced to the player as an error. What `/diag` reported now lives on the
@@ -158,7 +168,7 @@ Modules **K**, **L** and **N** already run for you, with no switch. Between them
 - Optimized Context on Gemma and GLM can make the context hook read-only, silently discarding every injection. Chronicle no longer tries to detect this, because it could not tell a blocked channel from a model ignoring an instruction. Turn Optimized Context off; the diagnostics card reports the context size it was last handed, and you can judge.
 - **N** keeps the prompt short enough that a 4K turn still has room for the story, and now applies automatically at the two smallest context sizes rather than waiting to be switched on.
 
-**Atlas and Raven are unsupported.** They are permanently cache-efficient and do not support all scripting functions. Chronicle will detect it (with M on) and say so, but there is no configuration that makes them work.
+**Atlas and Raven are unsupported.** They are permanently cache-efficient and do not support all scripting functions. Chronicle cannot detect which model you are using, and there is no configuration that makes them work.
 
 ---
 
@@ -188,7 +198,7 @@ What happens:
 - **A transaction staged but not yet committed is lost.** At most one thought, from the response
   generated immediately before the rollback. Take one more action before swapping the library if
   you want to avoid even that.
-- **Anything Chronicle wrote to `state.memory.frontMemory` is cleared** the moment Module M sees a working channel again, and only ever touched lines it wrote itself, marked `[Chronicle]`. If you roll back while the fallback is active, clear that field by hand.
+- **Anything an earlier Chronicle build wrote to `state.memory.frontMemory` is cleared** on the first turn after upgrading, and only ever a line it wrote itself, marked `[Chronicle]`. Current builds never write there at all.
 - **Module cards and `state.CHRONICLE` are left in place, ignored and inert.** Delete them only if
   you want the space back. Pinned keys keep their `#` prefix and read as ordinary thought names
   under Inner Self, so nothing is lost, only unprotected.

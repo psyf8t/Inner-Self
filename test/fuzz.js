@@ -433,7 +433,7 @@ function enableModules(adventure) {
         return false;
     }
     card.entry = card.entry.split("\n").map(line => (
-        /^> (?:Tiered memory|Track world state|Track who witnessed|Enable diagnostics)/.test(line)
+        /^> (?:Tiered memory|Track world state|Enable diagnostics)/.test(line)
             ? `${line.slice(0, line.indexOf(":"))}: true`
             : line
     )).join("\n");
@@ -537,7 +537,6 @@ function enableModules(adventure) {
     // Every module's own structures stayed inside their caps
     const ch = adventure.state.CHRONICLE;
     check(ch.journal.length <= 20, "modules", `journal grew to ${ch.journal.length}`);
-    check(ch.events.length <= 200, "modules", `event log grew to ${ch.events.length}`);
     check(
         String(ch.world.date).length <= 200,
         "modules", `the date grew to ${String(ch.world.date).length} chars`

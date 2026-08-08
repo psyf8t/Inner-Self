@@ -10,11 +10,11 @@ Built on [Inner Self](https://github.com/LewdLeah/Inner-Self) by LewdLeah ❤️
 
 ## Overview
 
-Chronicle is an AI Dungeon mod that lets the characters in your story keep their own memories, and lets the world around them keep track of itself. Characters form private thoughts, revise them, and act on them, and they keep the ones that define them. The world keeps a date that moves when the story says it moves, a place, an arc, and a list of who owes what to whom. Characters who were not in the room stay wrong about what happened in it.
+Chronicle is an AI Dungeon mod that lets the characters in your story keep their own memories, and gives the world around them a calendar. Characters form private thoughts, revise them, and act on them, and they keep the ones that define them, however long the story runs. The world keeps a date that moves when the story says it moves — three weeks on the road advance it by three weeks — and the place you are in.
 
 It is built for adventures that run for hundreds of turns, so the thing it protects hardest is your history. Nothing a character learns is written down until the response it came from is really part of your story. Retry as often as you like: the version you threw away leaves no trace in anyone's memory.
 
-Everything past the basics is off when you install it. Turn on what you want, one at a time.
+Two features are off when you install it. Turn on what you want, one at a time.
 
 ---
 
@@ -24,10 +24,9 @@ Chronicle is a fork of [Inner Self v1.0.2](https://github.com/LewdLeah/Inner-Sel
 
 Inner Self gives individual characters memory. Chronicle keeps that and adds the parts a long story needs around it:
 
-- **World state** — a date, a location, an arc, faction standing, open debts and threats, on a card you can edit.
+- **World state** — an in-game date with a season and a year, and a location, on a card you can edit.
 - **In-game time** — a calendar that moves when the story says it moves, not once per turn.
-- **A knowledge model** — who witnessed what, and what they still wrongly believe because they were not there.
-- **A transaction ledger** — every one of those writes is staged and only committed once the generation that produced it survives into your story, so a retry cannot corrupt a memory, a clock, or the calendar.
+- **A transaction ledger** — every one of those writes is staged and only committed once the generation that produced it survives into your story, so a retry cannot corrupt a memory or the calendar.
 
 With every module switched off, Chronicle produces byte-for-byte the same output Inner Self does. That is asserted in the test harness against upstream, over a 300 turn replay.
 
@@ -43,8 +42,7 @@ With every module switched off, Chronicle produces byte-for-byte the same output
 | **Zero Immersion Breaks** | Absolutely NO "please select continue" messages (!!!) |
 | **Real-Time Brain Editor** | View or edit any NPC brain in the associated story card notes |
 | **Pinned Core Memories** | Protect a defining thought so nothing may ever forget it |
-| **World Chronicle** | Date, place, arc, standing, debts and threats, on a card that outranks the script |
-| **Knowledge & Rumour** | Characters act on what they saw, and stay wrong about the rest |
+| **World Chronicle** | The in-game date and where you are, on a card that outranks the script |
 | **Answers For Itself** | A diagnostics card showing what each turn cost and what was overruled |
 | **Context-Aware** | Every injection scales to the context your model and tier actually give you |
 | **Auto-Cards Integration** | Bundled unmodified, enable it whenever you like (optional) |
@@ -65,29 +63,27 @@ Everything else is best effort. Chronicle asks the model to answer in a small pa
 
 They are cache-efficient models and do not support all scripting functions. Chronicle cannot inject anything into their context, **no configuration fixes it, and the script has no way to detect which model you are using.** Upstream Inner Self warns players off these two for the same reason. If you play Atlas or Raven, this mod has nothing to give you.
 
-Module M can detect that injections are being discarded and will say so in a message, but detecting it is all it can do.
-
 ### Optimized Context must be off
 
 Gemma 31B and GLM 5.1 offer an Optimized Context toggle. With it **on**, the context hook may become read-only: everything Chronicle writes is silently thrown away, and your world simulation quietly does nothing.
 
 The honest trade: turning Optimized Context **off** roughly halves the context those models give you, so Chronicle has less room to work in. Leaving it **on** gives you the room and then disables the thing you wanted the room for. Off is the right answer for this mod.
 
-Enable Module M and Chronicle will check the channel for you — it asks the model to begin one reply in twelve with `(ok)`, and after three misses in a row it concludes the channel is closed, moves the world block to `state.memory.frontMemory`, and tells you once what the setting is costing you. But you should know before you install rather than after.
+Chronicle does not try to detect this for you. An earlier build did, by asking the model to begin the occasional reply with a marker, and it could not tell a blocked channel from a model that simply ignored the instruction — so it was removed rather than left to guess. The diagnostics card reports the context size it was last handed; turn Optimized Context off and judge for yourself.
 
 ### What you get at each context size
 
 `info.maxChars` is read every single turn by Module K, which has no switch, and mapped to a profile. These are the values in `BUDGET_TABLE` at the top of the module, which is the only place they exist:
 
-| Profile | `maxChars` | World block | Full brains | Digests | Witness lines | Clock lines | Audit | Chronicle's share |
-|:--|:--|:--|:--|:--|:--|:--|:--|:--|
-| **XS** | under 12,000 | 350 ch | 1 | off | off | 1 | off | 12% |
-| **S** | 12,000–32,000 | 500 ch | 1 | 2 | off | 1 | every 150 turns | 20% |
-| **M** | 32,000–80,000 | 700 ch | 2 | 3 | 1 | 2 | every 100 turns | 30% |
-| **L** | 80,000–200,000 | 700 ch | 3 | 4 | 2 | all | every 75 turns | 35% |
-| **XL** | over 200,000 | 900 ch | 4 | all | all | all | every 75 turns | 40% |
+| Profile | `maxChars` | World block | Chronicle's share |
+|:--|:--|:--|:--|
+| **XS** | under 12,000 | 350 ch | 12% |
+| **S** | 12,000–32,000 | 500 ch | 20% |
+| **M** | 32,000–80,000 | 700 ch | 30% |
+| **L** | 80,000–200,000 | 700 ch | 35% |
+| **XL** | over 200,000 | 900 ch | 40% |
 
-A profile only ever takes away — your own settings stay the ceiling. If a turn would still overrun its share, features are given up in a fixed order rather than all shaved evenly: **audit → witness lines → digests → extra brains → bond note → clock detail → world block**, down to a floor the world never goes below. Losing the audit entirely beats keeping half of everything.
+The table had a column per module once. Most of those modules are gone, and what is left is the world block and the share of your context Chronicle may spend in total. A profile only ever takes away — your own settings stay the ceiling — and if a turn would still overrun its share, the world block is what gives, down to a floor it never goes below.
 
 Two things worth knowing:
 
@@ -176,26 +172,24 @@ Your existing adventures carry over with no data loss: the config card is found 
 
 ### Suggested play order
 
-Four optional modules, and they layer cleanly:
+Two optional modules, so there is not much to stage:
 
-1. **Turns 1–50: the basics.** The ledger (A), budget autoscaling (K), the compliance monitor (L) and lean emission (N) already run and need no setup. Turn on **B** for pinned memories and play.
-2. **Add C** once you want the world to keep a date. It costs at most 500 characters a turn at a small context.
-3. **Add E** around turn 100, when there is enough history for a character to have missed something.
-4. **Add J** whenever you want to see what any of it is costing.
+1. **Turn on B and play.** The ledger (A), budget autoscaling (K), the compliance monitor (L) and lean emission (N) already run and need no setup. Tiered memory costs nothing extra and is the difference between a character who is still themselves at turn 800 and one who is not.
+2. **Add C when you want the world to keep time.** About 40 characters a turn.
+3. **Diagnostics (J) is already on.** Its card is where Chronicle tells you what each turn cost and what your context size overruled.
 
 ---
 
 ## Module reference
 
-Three modules have no switch and always run: **A** the transaction ledger, **K** budget autoscaling, and **L** the compliance monitor. A fixed injection budget cannot meet a context that changes per action, and nothing else notices when a model stops honouring the operation format, so both are infrastructure rather than features. Everything else is off until you turn it on. Settings below are the labels as they appear on the "Configure Chronicle" card.
+Four modules have no switch and always run: **A** the transaction ledger, **K** budget autoscaling, **L** the compliance monitor, and **N** lean emission. A fixed injection budget cannot meet a context that changes per action, nothing else notices when a model stops honouring the operation format, and a 4,000 character context has no room for a verbose prompt — so all four are infrastructure rather than features. **J** ships on and can be switched off; the other two are off until you turn them on. Settings below are the labels as they appear on the "Configure Chronicle" card.
 
 | | Module | What you notice in play | Default |
 |:--|:--|:--|:--|
 | **A** | Transaction ledger | Retrying leaves no trace | **always on** |
 | **B** | Tiered memory | Characters stop forgetting what defines them | off |
 | **C** | World chronicle | A date and a place that persist | off |
-| **E** | Knowledge model | Characters are wrong about things they missed | off |
-| **J** | Diagnostics | State and timings stay under control | off |
+| **J** | Diagnostics | State and timings stay under control, and a card that answers for itself | **on** |
 | **K** | Budget autoscaling | The mod fits whatever context you have | **always on** |
 | **L** | Compliance monitor | Chronicle stops nagging a model that cannot answer | **always on** |
 | **N** | Lean emission | Prompts get short when room is tight | **always on** |
@@ -204,7 +198,7 @@ Three modules have no switch and always run: **A** the transaction ledger, **K**
 
 Nothing is written to a story card during the turn that produced it. The turn's changes are staged, then committed on your next action, once the generation they came from can be proven to be in your history.
 
-**You notice:** retrying no longer leaves a thought behind from the version you discarded, and a retried response is free to think its own thought. Every other module writes through this ledger too, so a retry cannot leave a clock advanced or the calendar moved.
+**You notice:** retrying no longer leaves a thought behind from the version you discarded, and a retried response is free to think its own thought. Every other module writes through this ledger too, so a retry cannot leave the calendar moved.
 **Settings:** none. It is a bug fix, not a feature, and it is always on.
 **Small print:** a thought appears on the brain card one action later than it used to. The model never sees the difference, because the commit happens before the next context is built.
 
@@ -214,30 +208,20 @@ Nothing is written to a story card during the turn that produced it. The turn's 
 
 Thoughts sit in three tiers. **Core** thoughts are pinned and are never evicted, never renamed and never deleted, even when the model explicitly asks. **Long-term** thoughts have earned their place by being linked to the story often enough, and can only be merged, never dropped. **Working** thoughts are everything else, and are evicted coldest-first when a brain outgrows its budget.
 
-**You notice:** a character stops losing the thing that defines them at turn 400. Pin a thought with `/pin`, or by putting `#` in front of its key in the card notes. Each character is also seeded with one pinned fact taken from their own story card the first time they think, stored as `#defining_fact`.
+**You notice:** a character stops losing the thing that defines them at turn 400. Pin a thought by putting `#` in front of its key in the card notes. Each character is also seeded with one pinned fact taken from their own story card the first time they think, stored as `#defining_fact`.
 **Settings:** *Maximum pinned core thoughts per character* (default 5) · *Maximum characters of thought per brain* (default 4000) · *Story links before a thought becomes long-term* (default 2).
 **Small print:** when only long-term thoughts remain, Chronicle spends a turn asking the model to merge the two coldest into one. Going over the pin limit demotes the coldest pins rather than deleting them.
 
 ### C — World chronicle
 
-*Setting: **Track world state (date, place, arc, factions)***
+*Setting: **Track the in-game date and location***
 
-A story card called "Chronicle" holds the in-game date, location, active arc, faction standing, open debts, open threats, and what has been lost to memory. A short block of it is injected above the character brains every turn.
+A story card called "Chronicle" holds the in-game date and where you are. One short line is injected above the character brain every turn. It used to hold factions, debts, threats and lost memories too; those were lists you typed being read back to you, which a plain story card does for free, so they were cut.
 
 **You notice:** the narrator stops forgetting where you are and what day it is. Edit the card and Chronicle believes you over its own memory, immediately.
-**Settings:** *Maximum characters of world state per turn* (default 700) · *In-game date the adventure began on* (default "Day 1") · *Maximum days one turn may advance* (default 30).
+**Settings:** *Maximum characters of world state per turn* (default 700) · *In-game date the adventure began on* (default "Day 1") · *Maximum days one turn may advance* (default 30). In practice the line costs about 40 characters.
 **Calendar:** the date carries a season and a year, both derived from the day count so they cannot drift out of step with it. The season names and season length are yours to edit on the Chronicle card — `Seasons: Spring; Summer; Autumn; Winter` and `Season length: 91` — and a scenario with its own calendar just writes its own names there.
 **Small print:** the calendar moves on narrative phrasing, from an editable table (`TIME_TABLE`) mapping both time skips ("the next morning", "a fortnight later") and travel ("you set off for the guild", "three days on the road", "for two weeks") onto days. An explicit `[+3 days]` marker is trusted past the per-turn cap. One advance per turn: the first phrase that matches wins. Travel phrasing is a heuristic and your scenario will have its own — that table is where you add it. When the block does not fit, whole lines are dropped by priority; nothing is cut mid-sentence.
-
-### E — Knowledge model
-
-*Setting: **Track who witnessed what, and what they still believe***
-
-A byte-capped log of what happened and who was there. When a character's context is built they are told what they did **not** witness, and any fact they last knew in an older form is injected as what they still believe.
-
-**You notice:** a character walks in and confidently acts on information that stopped being true while they were away. That is the feature, not a bug.
-**Settings:** *Maximum characters of witnessed event log* (default 3000) · *Chance per turn that a secret spreads to someone* (default 10%).
-**Small print:** facts carry a visibility class — public, household, private, sealed — and spread at a rate set by the class times your setting. Sealed facts never move on their own; someone has to carry them.
 
 ### J — Diagnostics and safety rails
 
@@ -254,9 +238,9 @@ Watches the saved state size, warning at 60% of budget and trimming at 85% by dr
 
 Reads `info.maxChars` every turn and maps it to a profile, then derives every injection budget from that. See [what you get at each context size](#what-you-get-at-each-context-size).
 
-**You notice:** the world block gets shorter and the audit stops when your context shrinks, instead of everything being truncated at random. The diagnostics card names the current profile and everything it overruled.
+**You notice:** the world block gets shorter when your context shrinks, instead of everything being truncated at random. The diagnostics card names the current profile and everything it overruled.
 **Settings:** none. The profile table is `BUDGET_TABLE` at the top of the module, and editing it is how you change what each size buys.
-**Small print:** because it always runs, a profile can cap a setting you chose. Asking for three concurrent brains at a 25,000 character context gets you one, and asking for an audit every 10 turns gets you one every 150 at that size. The diagnostics card names every override explicitly — `world block 500 (you set 900)` — so a capped setting is never silent.
+**Small print:** because it always runs, a profile can cap a setting you chose. Asking for a 700 character world block at a 25,000 character context gets you 500. The diagnostics card names every override explicitly — `world block 500 (you set 700)` — so a capped setting is never silent.
 
 ### L — Compliance monitor
 
@@ -266,7 +250,7 @@ Keeps a rolling window of the last 40 task turns, scoring each as answered, reco
 
 **You notice:** on a model that cannot hold the format, Chronicle stops asking rather than wasting every turn on it — and tells you once that it has. The band is on the diagnostics card. Degraded shortens the prompts and drops the extras competing for the model's attention. Minimal stops tasks entirely, keeps the world and existing memories injected read-only, and tries again later.
 **Settings:** *Turns to stop asking after the model cannot answer* (default 25). The monitor itself cannot be switched off.
-**Small print:** falling is immediate; climbing is one band per 20 compliant turns. Because it always runs, a model that stops answering will quietly cost you the optional extras before it costs you thoughts — that is the degradation working, and `/diag` names the band. This is what makes Dynamic DeepSeek workable — it rotates between three models on every action, so Chronicle measures capability instead of assuming it.
+**Small print:** falling is immediate; climbing is one band per 20 compliant turns. Because it always runs, a model that stops answering will quietly cost you the optional extras before it costs you thoughts — that is the degradation working, and the diagnostics card names the band. This is what makes Dynamic DeepSeek workable — it rotates between three models on every action, so Chronicle measures capability instead of assuming it.
 
 ### N — Lean emission
 
@@ -274,7 +258,7 @@ Keeps a rolling window of the last 40 task turns, scoring each as answered, reco
 
 Under the XS and S profiles, or whenever the compliance band is not healthy, every prompt drops to a terse register: one imperative line plus the grammar example, brains as bare `key: value` lines, the world as one comma-joined line.
 
-**You notice:** more of a small context left for the actual story. Measured with every module on: 10.8% of an 8,000 character context at XS, 7.9% of a 20,000 character context at S.
+**You notice:** more of a small context left for the actual story. Measured with both optional modules on: 6.8% of an 8,000 character context at XS, 4.6% of a 20,000 character context at S.
 **Settings:** none. Module K supplies the profile, and also always runs.
 
 ---
@@ -386,14 +370,13 @@ Your task is to transform the character concept into a JSON object
 <details>
 <summary><b>which modules to ship enabled (click to expand)</b></summary>
 
-Every module defaults off, including in the creator control panel. If your scenario is built around one of them, switch it on there so players get it from turn one:
+Two modules have a switch, and both default off in the creator control panel. If your scenario is built around one of them, switch it on there so players get it from turn one:
 
-- A **mystery or intrigue** scenario wants **F** (clocks) and **E** (knowledge), and probably **C** for the date.
-- A **relationship-led** scenario wants **I** (bonds) and **B** (pinned memories).
 - A **long survival or travel** scenario wants **C** most of all, for the calendar.
-- **Any** scenario aimed at DeepSeek, Gemma or GLM players wants **M and N** on. K and L already run unconditionally; these two are the rest of what keeps a small context alive.
+- A **relationship-led** or long-running character scenario wants **B**, so a defining thought cannot be evicted.
+- **Any** scenario aimed at DeepSeek, Gemma or GLM players needs no decision from you: K, L and N run unconditionally and are the whole of what keeps a small context alive.
 
-Leave **D** off unless you know your players have a large context.
+**J** already ships on. Leave it on unless you have a reason: it is the only window into what Chronicle is doing, and it costs one story card and nothing in context.
 
 </details>
 
@@ -407,13 +390,13 @@ Things that are true and worth knowing before you are disappointed by them.
 
 **The calendar is a phrase table, not understanding.** Module C moves the date by matching `TIME_TABLE`, which covers time skips ("the next morning", "a fortnight later") and travel ("you set off for the guild", "three days on the road"). It will miss phrasings your scenario uses, and it advances at most once per turn on the first match. That table is a plain list near the top of the module, and adding your own phrasing is the intended fix.
 
-**The tests use a scripted model, not a real one.** The harness replays 300 turn sessions and asserts the ledger, the caps, the migration, the profiles and the bands, and the fuzzer throws thousands of hostile strings at every parser. None of that proves a real model will hold the parenthetical format under load, because that varies by model, by turn, and on Dynamic DeepSeek by the individual action. Module L exists precisely because it varies. Treat compliance as something to watch in `/diag`, not something the tests have settled.
+**The tests use a scripted model, not a real one.** The harness replays 300 turn sessions and asserts the ledger, the caps, the migration, the profiles and the bands, and the fuzzer throws thousands of hostile strings at every parser. None of that proves a real model will hold the parenthetical format under load, because that varies by model, by turn, and on Dynamic DeepSeek by the individual action. Module L exists precisely because it varies. Treat compliance as something to watch on the diagnostics card, not something the tests have settled.
 
 **Small models will not hold the grammar.** Anything in the 12B class will produce the op format unreliably at best. Module L degrades instead of failing — you keep your existing memories and the world, you just stop gaining new thoughts — but the experience is thinner, and no setting changes that.
 
 **Brains live on undocumented platform surface.** Every brain is stored in a story card's `description` field, which AI Dungeon does not document. This is inherited from Inner Self, it has worked for a long time, and Chronicle reads it defensively and complains loudly in the script log if it ever comes back missing. It is not guaranteed by the platform.
 
-**Whether `onOutput` fires once per retry batch or once per candidate is unverified.** AI Dungeon generates retry candidates in a batch. The ledger keeps up to four stagings for one visible turn and commits the one that matches your history, so both behaviours are safe, and every staging is logged for `/diag`. If you can watch that log in a real game, you can settle the question.
+**Whether `onOutput` fires once per retry batch or once per candidate is unverified.** AI Dungeon generates retry candidates in a batch. The ledger keeps up to four stagings for one visible turn and commits the one that matches your history, so both behaviours are safe, and every staging is listed on the diagnostics card. If you can watch that log in a real game, you can settle the question.
 
 **Module A changes retry semantics on purpose.** That is the fix, but it is a behaviour change: a retried response now forms its own thought, where Inner Self would have kept the first one.
 
@@ -455,11 +438,11 @@ node test/fuzz.js      # ~3000 assertions of hostile input against every parser
 
 The harness runs Chronicle and upstream Inner Self side by side in stubbed AI Dungeon runtimes, with deterministic randomness and a JSON round-trip of `state` after every hook, and asserts byte-identical text out of every hook across a 300 turn replay with mid-session setting changes. It replays a save produced by genuinely running upstream to prove migration is lossless, replays a Chronicle save back into upstream to prove rollback, and drives retries, erases, continues and injected exceptions through the ledger.
 
-For the compatibility modules it replays 300 turns at 8k, 20k, 60k, 150k and 400k characters plus an oscillating context; drives a configurable sloppy-model stub at 0%, 20%, 50% and 80% failure rates to check the compliance bands and gradual recovery; discards the context hook's return value to prove Module M notices and that the world still reaches the model; and fires `onOutput` three times for one visible turn to prove exactly one commit lands.
+For the compatibility modules it replays 300 turns at 8k, 20k, 60k, 150k and 400k characters plus an oscillating context; drives a configurable sloppy-model stub at 0%, 20%, 50% and 80% failure rates to check the compliance bands and gradual recovery; and fires `onOutput` three times for one visible turn to prove exactly one commit lands.
 
-The fuzzer feeds every parser unbalanced brackets, 10,000 character keys, zero-width floods, nested backticks, injected boundary markers, prototype-pollution key names, hostile world and clock cards, hostile console arguments, and `info.maxChars` values of `NaN`, `Infinity`, negatives and strings — asserting nothing throws, no hook returns an empty string, no prototype is touched, no unrelated card is modified, and every byte cap holds.
+The fuzzer feeds every parser unbalanced brackets, 10,000 character keys, zero-width floods, nested backticks, injected boundary markers, prototype-pollution key names, hostile world cards, and `info.maxChars` values of `NaN`, `Infinity`, negatives and strings — asserting nothing throws, no hook returns an empty string, no prototype is touched, no unrelated card is modified, and every byte cap holds.
 
-Measured over three 300 turn runs with every module enabled, 2,700 hook calls: 0.54 ms median, 0.95 ms at the 95th percentile, 1.9 ms at the 99th, 3.2 ms worst — against the platform's 2 second ceiling. Occasional outliers above that are garbage collection, not work. Saved state about 20 KB, or about 5.6 KB with every module off.
+Measured over three 300 turn runs with every module enabled, 2,700 hook calls: 0.54 ms median, 0.95 ms at the 95th percentile, 1.9 ms at the 99th, 3.2 ms worst — against the platform's 2 second ceiling. Occasional outliers above that are garbage collection, not work. Saved state about 7.7 KB after 300 turns with both optional modules on, about 7.0 KB with them off.
 
 </details>
 
@@ -470,18 +453,15 @@ Measured over three 300 turn runs with every module enabled, 2,700 hook calls: 0
 ### Chronicle 1.0.0
 - **A** transaction ledger — staged writes, committed only once the generation survives into history
 - **B** tiered memory — pinned core, long-term merged by compression, working evicted coldest-first
-- **C** world chronicle — date, place, arc, standing, debts, threats, on an authoritative card
-- **D** ensemble — several present characters thinking, sharing one budget
-- **E** knowledge model — witnessed events, stale beliefs, rumour by visibility class
-- **F** clocks and consequences — player-authored progress tracks and scheduled events
-- **G** continuity auditor — reports contradictions, never auto-corrects
-- **H** player console — twelve commands, colliding native names deliberately unregistered
-- **I** bonds — a seven rung ladder that cannot be skipped upward
-- **J** diagnostics — state budget, hook time rails, card index, diagnostics card
+- **C** world chronicle — the in-game date and where you are, on an authoritative card
+- **J** diagnostics — state budget, hook time rails, card index, diagnostics card, on by default
 - **K** budget autoscaling — every injection scaled to `info.maxChars`, read fresh each turn, no switch
 - **L** compliance monitor — measures whether the model can answer and stops asking when it cannot, no switch
-- **M** injection canary — detects a read-only context hook, falls back to the memory channel
-- **N** lean emission — terse prompts under small contexts or poor compliance
+- **N** lean emission — terse prompts under small contexts or poor compliance, no switch
+- Seven modules were built and cut before release: ensemble, the knowledge model, clocks and
+  consequences, the continuity auditor, the player console, bonds, and the injection canary. They
+  competed for one context budget and one thought per turn, and at a small context most of them
+  could not fit. See `MIGRATION.md`.
 - Reserved property names and oversized keys refused at every parse boundary
 - Forked from Inner Self v1.0.2
 

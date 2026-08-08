@@ -362,17 +362,20 @@ test("every Inner Self setting reads back identically, despite the rename", () =
     }
 });
 
-test("every module ships off by default", () => {
+test("the optional modules ship off, and diagnostics ships on", () => {
     const settings = readSettings(parity.chronicle);
-    const flags = [
+    for (const flag of [
         "tiered memory with pinned core thoughts",
-        "track world state (date, place, arc, factions)",
-        "track who witnessed what, and what they still believe",
-        "enable diagnostics and safety rails"
-    ];
-    for (const flag of flags) {
+        "track the in-game date and location"
+    ]) {
         assertEqual(settings[flag], "false", `module flag "${flag}" is not off by default`);
     }
+    // With no console, the diagnostics card is the only window into what Chronicle is
+    // doing, and it costs one card and no context
+    assertEqual(
+        settings["enable diagnostics and safety rails"], "true",
+        "diagnostics should ship on"
+    );
 });
 
 test("state stayed JSON-serializable throughout", () => {
@@ -901,13 +904,10 @@ const MODULE_ROWS = {
     core: /^> Maximum pinned core thoughts per character:/,
     brainChars: /^> Maximum characters of thought per brain:/,
     promote: /^> Story links before a thought becomes long-term:/,
-    world: /^> Track world state \(date, place, arc, factions\):/,
+    world: /^> Track the in-game date and location:/,
     worldChars: /^> Maximum characters of world state per turn:/,
     startDate: /^> In-game date the adventure began on:/,
     maxDays: /^> Maximum days one turn may advance:/,
-    knows: /^> Track who witnessed what, and what they still believe:/,
-    eventChars: /^> Maximum characters of witnessed event log:/,
-    rumor: /^> Chance per turn that a secret spreads to someone:/,
     diag: /^> Enable diagnostics and safety rails:/,
     cooldown: /^> Turns to stop asking after the model cannot answer:/,
     timeBudget: /^> Milliseconds a hook may spend before skipping extras:/,
@@ -1087,12 +1087,7 @@ test("the world card is created, injected, and capped", () => {
     assert(card, "no world card was created");
     card.description = [
         "Date: Day 4",
-        "Location: Fenwater Row",
-        "Arc: The intercepted letter",
-        "Open threats: the watch is asking about the barge; the tide clock is running fast",
-        "Open debts: forty marks to Silas; a favour to Maren",
-        "Standing: river guild +2; the watch -3",
-        "Lost to memory: "
+        "Location: Fenwater Row"
     ].join("\n");
     const step = session.play("> You walk the row with Leah.", "do");
     const context = step.contextOut[0];
@@ -1113,7 +1108,7 @@ test("the world card is created, injected, and capped", () => {
 test("narrative phrasing moves the calendar, and a retry does not move it twice", () => {
     const { adventure, session } = moduleAdventure({ world: "true" });
     const card = cardTitled(adventure, "Chronicle");
-    card.description = "Date: Day 4\nLocation: Fenwater Row\nArc: \nOpen threats: \nOpen debts: \nStanding: \nLost to memory: ";
+    card.description = "Date: Day 4\nLocation: Fenwater Row";
     session.play("> You take a room for the night.", "do");
     const before = adventure.state.CHRONICLE.world.date;
     session.force("The next morning, Leah is already at the wharf counting barges.");
@@ -1133,49 +1128,17 @@ test("hand edits to the world card win over stored state", () => {
     const { adventure, session } = moduleAdventure({ world: "true" });
     session.play("> You look around.", "do");
     const card = cardTitled(adventure, "Chronicle");
-    card.description = "Date: Harvest Eve\nLocation: the lighthouse\nArc: \nOpen threats: \nOpen debts: \nStanding: \nLost to memory: ";
+    card.description = "Date: Harvest Eve\nLocation: the lighthouse";
     const step = session.play("> You climb the stair with Leah.", "do");
     assertEqual(adventure.state.CHRONICLE.world.date, "Harvest Eve", "the card did not win");
     assert(step.contextOut[0].includes("the lighthouse"), "the edited location was not injected");
-});
-
-suite("8. Module E — knowledge model");
-
-test("an absent character is told what they did not witness", () => {
-    // Profile L, so Module K allows witness lines; at S they are the first thing dropped
-    const { adventure, session } = moduleAdventure({ knows: "true", world: "true" }, { maxChars: 150000 });
-    // Leah and Maren do something Silas is not there for
-    for (let i = 0; i < 4; i++) {
-        session.force(`(sealed_letter = \`I watched Maren hide the letter under the counter.\`) Leah hands Maren the sealed letter. Round ${i}.`);
-        session.play(`> You watch Leah and Maren, round ${i}.`, "do");
-    }
-    // Now a scene where Silas acts
-    let sawBlindSpot = false;
-    for (let i = 0; (i < 6) && !sawBlindSpot; i++) {
-        session.force(`(late_arrival = \`I walked in on something and nobody will say what.\`) Silas walks in alone, round ${i}.`);
-        const step = session.play(`> You greet Silas, round ${i}.`, "do");
-        if (/Silas did not witness/.test(step.contextOut[0])) {
-            sawBlindSpot = true;
-        }
-    }
-    assert(sawBlindSpot, "Silas was never told what he had missed");
-    assert(0 < adventure.state.CHRONICLE.events.length, "no events were recorded");
-});
-
-test("the event log stays inside its byte cap", () => {
-    const { adventure, session } = moduleAdventure({ knows: "true", eventChars: "500" });
-    for (const action of actionPlan(120)) {
-        session.play(action.input, action.type);
-    }
-    const size = JSON.stringify(adventure.state.CHRONICLE.events).length;
-    assert(size <= 500, `the event log grew to ${size} chars`);
 });
 
 suite("13. Module J — diagnostics and safety rails");
 
 test("the state budget warns, then trims, and never overflows", () => {
     const { adventure, session } = moduleAdventure({
-        diag: "true", stateChars: "8000", knows: "true", world: "true", tiers: "true"
+        diag: "true", stateChars: "8000", world: "true", tiers: "true"
     });
     for (const action of actionPlan(200)) {
         session.play(action.input, action.type);
@@ -1235,7 +1198,7 @@ suite("14. Everything on at once");
 
 test("300 turns with every module on, retries and all, stays sane", () => {
     const { adventure, session } = moduleAdventure({
-        tiers: "true", world: "true", knows: "true", diag: "true", brainChars: "1200", stateChars: "40000"
+        tiers: "true", world: "true", diag: "true", brainChars: "1200", stateChars: "40000"
     });
     const plan = actionPlan(300);
     plan.forEach((action, i) => {
@@ -1264,7 +1227,6 @@ test("300 turns with every module on, retries and all, stays sane", () => {
     assert(10 < ch.stats.commits, `only ${ch.stats.commits} commits`);
     assert(0 < ch.stats.discards, "no retries were ever discarded");
     assert(ch.journal.length <= 20, "the journal exceeded its cap");
-    assert(ch.events.length >= 0, "events went missing");
     // Every module left something behind
     assert(cardTitled(adventure, "Chronicle"), "no world card");
     assert(cardTitled(adventure, "Chronicle Diagnostics"), "no diagnostics card");
@@ -1274,7 +1236,7 @@ test("300 turns with every module on, retries and all, stays sane", () => {
 
 test("with every module on, hooks stay well inside the two second ceiling", () => {
     const { adventure, session } = moduleAdventure({
-        tiers: "true", world: "true", knows: "true", diag: "true"
+        tiers: "true", world: "true", diag: "true"
     });
     const times = [];
     const original = adventure.hook.bind(adventure);
@@ -1301,8 +1263,7 @@ function budgetRun(maxChars, { turns = 300, oscillate = null, modules = {} } = {
     // Everything on, so the injection targets are asserted under the full load rather
     // than a convenient subset of it
     const { adventure, session } = moduleAdventure({
-        world: "true", knows: "true",
-        tiers: "true", diag: "true", ...modules
+        world: "true", tiers: "true", diag: "true", ...modules
     }, { maxChars });
     const card = brainCardOf(adventure, "Leah");
     if (card) {
@@ -1681,12 +1642,12 @@ test("every setting the generator emits is one the parser reads back", () => {
     };
     const booleans = flipBooleans();
     adventure.hook("context", "Recent Story:\nnothing yet.");
-    assert(10 < Object.keys(booleans).length, `only ${Object.keys(booleans).length} boolean rows found`);
+    assert(5 < Object.keys(booleans).length, `only ${Object.keys(booleans).length} boolean rows found`);
     check(booleans, "booleans");
     // Every module is on now, so every detail row is visible and can be bumped
     const numbers = bumpNumbers();
     adventure.hook("context", "Recent Story:\nnothing yet.");
-    assert(12 < Object.keys(numbers).length, `only ${Object.keys(numbers).length} numeric rows found`);
+    assert(8 < Object.keys(numbers).length, `only ${Object.keys(numbers).length} numeric rows found`);
     check(numbers, "numbers");
 });
 
@@ -1718,6 +1679,7 @@ test("entry and notes stay a matched pair", () => {
     // appearing as an orphan is a real one
     const PROSE_HEADINGS = new Set([
         cardKey("What each setting on this card does:"),
+        cardKey("Two optional modules, and they layer cleanly. Turn on tiered memory first and play fifty turns:"),
         cardKey("Write the first name of every intelligent story character on separate lines below, listed from highest to lowest trigger priority:")
     ]);
     const explained = new Set();
@@ -1982,13 +1944,10 @@ test("a single oversized legacy card migrates into the split layout with its val
         "> Maximum pinned core thoughts per character: 7",
         "> Maximum characters of thought per brain: 6000",
         "> Story links before a thought becomes long-term: 3",
-        "> Track world state (date, place, arc, factions): true",
+        "> Track the in-game date and location: true",
         "> Maximum characters of world state per turn: 900",
         "> In-game date the adventure began on: \"Harvest Eve\"",
         "> Maximum days one turn may advance: 14",
-        "> Track who witnessed what, and what they still believe: true",
-        "> Maximum characters of witnessed event log: 5000",
-        "> Chance per turn that a secret spreads to someone: 25%",
         "> Enable diagnostics and safety rails: true",
         "> Milliseconds a hook may spend before skipping extras: 900",
         "> Maximum characters of saved adventure state: 50000",
@@ -2023,7 +1982,6 @@ test("a single oversized legacy card migrates into the split layout with its val
         ["maximum pinned core thoughts per character", "7"],
         ["maximum characters of thought per brain", "6000"],
         ["in-game date the adventure began on", "\"Harvest Eve\""],
-        ["maximum characters of witnessed event log", "5000"],
         ["maximum characters of saved adventure state", "50000"],
         ["turns to stop asking after the model cannot answer", "40"]
     ]) {

@@ -109,20 +109,9 @@ globalThis.MainSettings = (class MainSettings {
     MAX_DAYS_ADVANCED_PER_TURN: 30
     // (1 to 365)
     ,
-    // Module E — do characters track who witnessed what, and act on what they still believe?
-    IS_KNOWLEDGE_MODEL_ENABLED: false
-    // (true or false)
-    ,
-    // Module E — how many characters of witnessed event log may be retained?
-    MAX_EVENT_LOG_CHARS: 3000
-    // (500 to 20000)
-    ,
-    // Module E — how likely is an unwitnessed household fact to reach someone each turn?
-    RUMOR_SPREAD_PERCENT_PER_TURN: 10
-    // (0 to 100)
-    ,
-    // Module J — are diagnostics and safety rails active?
-    IS_DIAGNOSTICS_ENABLED: false
+    // Module J — are diagnostics and safety rails active? With no console, the card this
+    // writes is the only window into what Chronicle is doing, so it ships switched on
+    IS_DIAGNOSTICS_ENABLED: true
     // (true or false)
     ,
     // Module J — how many milliseconds may a hook spend before optional work is skipped?
@@ -395,20 +384,9 @@ function Chronicle(hook) {
     MAX_DAYS_ADVANCED_PER_TURN: 30
     // (1 to 365)
     ,
-    // Module E — do characters track who witnessed what, and act on what they still believe?
-    IS_KNOWLEDGE_MODEL_ENABLED: false
-    // (true or false)
-    ,
-    // Module E — how many characters of witnessed event log may be retained?
-    MAX_EVENT_LOG_CHARS: 3000
-    // (500 to 20000)
-    ,
-    // Module E — how likely is an unwitnessed household fact to reach someone each turn?
-    RUMOR_SPREAD_PERCENT_PER_TURN: 10
-    // (0 to 100)
-    ,
-    // Module J — are diagnostics and safety rails active?
-    IS_DIAGNOSTICS_ENABLED: false
+    // Module J — are diagnostics and safety rails active? With no console, the card this
+    // writes is the only window into what Chronicle is doing, so it ships switched on
+    IS_DIAGNOSTICS_ENABLED: true
     // (true or false)
     ,
     // Module J — how many milliseconds may a hook spend before optional work is skipped?
@@ -547,22 +525,11 @@ function Chronicle(hook) {
         world: {
             date: "",
             day: 1,
+            place: "",
             // The calendar the day count is read against, editable on the Chronicle card
             seasonLength: 91,
-            seasons: ["Spring", "Summer", "Autumn", "Winter"],
-            place: "",
-            arc: "",
-            factions: {},
-            debts: [],
-            threats: [],
-            lost: []
+            seasons: ["Spring", "Summer", "Autumn", "Winter"]
         },
-        // Module E: byte-capped log of what happened and who saw it
-        events: [],
-        // Module E: current facts, and who knows them
-        facts: {},
-        // Module E: what each character still believes, after the truth moved on
-        stale: {},
         // Who is writing this turn, so a batch of retry candidates all reach the same brain
         writer: null,
         // Module J: hook timings, skips, the state size warning latch, and which settings
@@ -589,7 +556,7 @@ function Chronicle(hook) {
     // Modules D, F, G, H, I and M were removed. An adventure that ran them still has their
     // state and their cards, so both are dropped once, here, rather than lingering as dead
     // weight in every save and as decoration in every card list
-    for (const stale of ["clocks", "queue", "fire", "bonds", "audit", "console", "canary"]) {
+    for (const stale of ["clocks", "queue", "fire", "bonds", "audit", "console", "canary", "events", "facts", "stale"]) {
         if (Object.prototype.hasOwnProperty.call(CH, stale)) {
             delete CH[stale];
         }
@@ -597,7 +564,7 @@ function Chronicle(hook) {
     if (CH.settings && (typeof CH.settings === "object")) {
         // Remembered values for settings that no longer exist
         for (const key of Object.keys(CH.settings)) {
-            if (/ensemble|brains|clock|consequence|audit|bond|canary|terseprompt|playercommand/.test(key)) {
+            if (/ensemble|brains|clock|consequence|audit|bond|canary|terseprompt|playercommand|witness|event|secret|believe/.test(key)) {
                 delete CH.settings[key];
             }
         }
@@ -733,12 +700,8 @@ function Chronicle(hook) {
             worldChars: 700,
             startDate: "Day 1",
             maxDays: 30,
-            // Module E
-            knows: false,
-            eventChars: 3000,
-            rumor: 10,
             // Module J
-            diag: false,
+            diag: true,
             timeBudget: 1200,
             stateChars: 40000,
             // Modules K, L and N have no switch; only the cooldown is tunable
@@ -859,7 +822,7 @@ function Chronicle(hook) {
                 },
                 {
                     message: "First name of player character:",
-                    help: "Used to keep the story in your character's perspective, and to name who a bond is with.",
+                    help: "Used to keep the story in your character's perspective, and to tell your own actions from an NPC's.",
                     builder: (cfg = {}) => ` "${config.player || (() => {
                         const display = cfg.setter?.(S.PREDETERMINED_PLAYER_CHARACTER_NAME);
                         if (config.player === "") {
@@ -940,7 +903,7 @@ function Chronicle(hook) {
                     { message: "Tiered memory with pinned core thoughts:", help: "Pinned, long-term and working memory tiers. A full brain evicts its coldest working thought instead of asking the model what to burn.", ...factory(
                         "tiers", S.IS_TIERED_MEMORY_ENABLED
                     ) },
-                    { message: "Maximum pinned core thoughts per character:", help: "How many thoughts one character may pin. Pin with /pin, or by putting # in front of a key in their notes.", ...factory(
+                    { message: "Maximum pinned core thoughts per character:", help: "How many thoughts one character may pin. Pin one by putting # in front of its key in their notes.", ...factory(
                         "core", S.MAX_CORE_THOUGHTS, { lower: 1, upper: 20 }
                     ) },
                     { message: "Maximum characters of thought per brain:", help: "How large a brain may grow before the coldest working thought is evicted.", ...factory(
@@ -951,7 +914,7 @@ function Chronicle(hook) {
                     ) }
                 ] },
                 { rows: [
-                    { message: "Track world state (date, place, arc, factions):", help: "Keeps a \"Chronicle\" card holding the date, location, arc, standing, debts and threats, and injects a short block of it each turn. Edit that card and Chronicle believes you.", ...factory(
+                    { message: "Track the in-game date and location:", alias: "Track world state (date, place, arc, factions):", help: "Keeps a \"Chronicle\" card holding the date and where you are, and injects one short line of it each turn. The date carries a season and a year, and moves on narrative phrasing rather than once per turn. Edit that card and Chronicle believes you.", ...factory(
                         "world", S.IS_WORLD_CHRONICLE_ENABLED
                     ) },
                     { message: "Maximum characters of world state per turn:", help: "Ceiling on that block. Whole lines are dropped by priority rather than cut mid sentence.", ...factory(
@@ -971,17 +934,6 @@ function Chronicle(hook) {
                     },
                     { message: "Maximum days one turn may advance:", help: "Cap on a single time skip, unless the text carries an explicit [+n days] marker.", ...factory(
                         "maxDays", S.MAX_DAYS_ADVANCED_PER_TURN, { lower: 1, upper: 365 }
-                    ) }
-                ] },
-                { rows: [
-                    { message: "Track who witnessed what, and what they still believe:", help: "Characters are told what they missed, and keep acting on facts that changed while they were away.", ...factory(
-                        "knows", S.IS_KNOWLEDGE_MODEL_ENABLED
-                    ) },
-                    { message: "Maximum characters of witnessed event log:", help: "Byte cap on the record of what happened and who saw it.", ...factory(
-                        "eventChars", S.MAX_EVENT_LOG_CHARS, { lower: 500, upper: 20000 }
-                    ) },
-                    { message: "Chance per turn that a secret spreads to someone:", help: "Base rate at which an unwitnessed fact reaches someone. Sealed facts never move on their own.", ...factory(
-                        "rumor", S.RUMOR_SPREAD_PERCENT_PER_TURN, { lower: 0, upper: 100, suffix: "%" }
                     ) }
                 ] },
                 { rows: [
@@ -1022,16 +974,16 @@ function Chronicle(hook) {
                     message: `Chronicle ${version} is built on ${ancestry} by LewdLeah, used and modified under the MIT licence, with the original copyright retained in the library script. Auto-Cards is bundled unmodified. Please visit @LewdLeah on AI Dungeon through the link above; none of this exists without that work. ❤️`
                 },
                 {
-                    message: "Suggested order for a long campaign. Every module in the entry above ships switched off, so turn them on in stages rather than all at once. Turns 1 to 50, add tiered memory and watch /diag. Once the compliance band holds healthy and /diag confirms injections are landing, add the world chronicle, the console, and diagnostics. Add the knowledge model and clocks around turn 100. Add ensemble last, and only at Mythic context or above, because concurrent brains are where format compliance breaks first."
+                    message: "Two optional modules, and they layer cleanly. Turn on tiered memory first and play fifty turns: it keeps a character from forgetting what defines them, and costs nothing extra because it governs a brain that is already there. Add the date and location when you want the world to keep time. Diagnostics is already on, and its card is where Chronicle answers for itself."
                 },
                 {
-                    message: "Modules A, K and L have no switch and always run. A is the transaction ledger that makes retry safe, K scales every injection budget to your live context size, and L watches whether your model can still follow the operation grammar. Turning any of them off would break the rest."
+                    message: "Four parts have no switch and always run. The transaction ledger makes retry safe, budget autoscaling fits every injection to your live context size, the compliance monitor watches whether your model can still follow the operation grammar, and lean emission shortens the prompts when the context is small. Turning any of them off would break the rest."
                 },
                 {
-                    message: "Type /help in the adventure for the console, once you have enabled it. /diag shows your context profile, compliance band, and what each module is costing you per turn. /state shows the world. /undo reverts the last committed change."
+                    message: "The \"Chronicle Diagnostics\" card shows your context profile, anything that profile overruled, whether your model is still answering the task format, and what the last turn cost. It is script only and never reaches the model."
                 },
                 {
-                    message: "Avoid the Atlas and Raven models entirely; they cannot receive anything this script injects. Turn Optimized Context off if your model offers it, or the world simulation is silently discarded. Tuned for DeepSeek V3.2, Dynamic DeepSeek, Gemma 31B, and GLM 5.1."
+                    message: "Avoid the Atlas and Raven models entirely; they cannot receive anything this script injects. Turn Optimized Context off if your model offers it, or everything below is silently discarded. Tuned for DeepSeek V3.2, Dynamic DeepSeek, Gemma 31B, and GLM 5.1."
                 },
                 {
                     // Every row on this card, explained. The entry field is limited and the
@@ -2012,17 +1964,6 @@ function Chronicle(hook) {
                     continue;
                 }
                 record(line);
-                if (cfg.knows && (op.mod === "brain") && ((op.op === "set") || (op.op === "merge"))) {
-                    // A thought is a fact its owner holds, and facts are what spread
-                    applyModuleOp({
-                        mod: "fact",
-                        op: "assert",
-                        key: `${pending.agent}:${bareKey(String(op.key))}`.slice(0, 60),
-                        value: String(op.value),
-                        cls: classify(String(op.value)),
-                        knownBy: Array.isArray(pending.actors) ? pending.actors : [pending.agent]
-                    }, cfg);
-                }
             }
             if (applied === 0) {
                 journal("empty", { ops: pending.ops.length });
@@ -2045,8 +1986,6 @@ function Chronicle(hook) {
                 ), "");
                 card.description = serializeBrain(brain, pending.json === true);
             }
-            // Rumour moves exactly once per accepted turn, never on a retry
-            propagateFacts(cfg, Array.isArray(pending.agents) ? pending.agents : []);
             if (cfg.world) {
                 writeWorld();
             }
@@ -2087,10 +2026,9 @@ function Chronicle(hook) {
      * @param {Object|null} agent - The writing agent, or null when the world moved alone
      * @param {number} labelStart - Where the label counter stood before this transaction
      * @param {Object} config - Validated config
-     * @param {string[]} actors - Who the turn named
      * @returns {void}
      */
-    const parkTransaction = (staged = [], agent = null, labelStart = 0, config = {}, actors = []) => {
+    const parkTransaction = (staged = [], agent = null, labelStart = 0, config = {}) => {
         CH.pending = {
             // The turn that produced these operations, which a later turn must move past
             actionCount: getActionCount(),
@@ -2108,10 +2046,6 @@ function Chronicle(hook) {
             json: (config.json === true),
             // Module settings as they stood when this generation happened
             cfg: moduleConfig(config),
-            // Module E: who was in the room, and therefore who saw what
-            actors,
-            // Everyone who could hear a rumour, for propagation at commit time
-            agents: (config.agents || []).slice(0, 24),
             ops: staged
         };
         // Keep every staging made for this same turn, newest last, capped
@@ -2308,15 +2242,7 @@ function Chronicle(hook) {
                 CH.candidates = (Array.isArray(CH.candidates) && CH.pending) ? [CH.pending] : [];
             }],
             ["journal", () => { CH.journal = CH.journal.slice(-5); }],
-            ["event log", () => { CH.events = CH.events.slice(-Math.ceil(CH.events.length / 2)); }],
-            ["stale beliefs", () => { CH.stale = {}; }],
             ["reference counts", () => { CH.mem = {}; }],
-            ["facts", () => {
-                const keys = Object.keys(CH.facts).sort((a, b) => (CH.facts[a].turn - CH.facts[b].turn));
-                for (const key of keys.slice(0, Math.ceil(keys.length / 2))) {
-                    delete CH.facts[key];
-                }
-            }],
             ["diagnostics", () => { CH.diag.hooks = { input: [], context: [], output: [] }; }]
         ];
         for (const [what, trim] of trims) {
@@ -2451,9 +2377,6 @@ function Chronicle(hook) {
         promote: config.promote,
         world: (config.world === true),
         maxDays: config.maxDays,
-        knows: (config.knows === true),
-        eventChars: config.eventChars,
-        rumor: config.rumor,
         diag: (config.diag === true),
         stateChars: config.stateChars,
         timeBudget: config.timeBudget
@@ -2461,8 +2384,7 @@ function Chronicle(hook) {
     /** The settings a commit falls back on when a transaction predates them */
     const commitConfig = (pending = {}) => ({
         tiers: false, core: 5, brainChars: 4000, promote: 2, world: false, maxDays: 30,
-        knows: false, eventChars: 3000, rumor: 10, clocks: false, bonds: false,
-        bondTurns: 150, audit: false, diag: false, stateChars: 40000, timeBudget: 1200,
+        diag: true, stateChars: 40000, timeBudget: 1200,
         ...((pending && (typeof pending.cfg === "object") && pending.cfg) || {})
     });
     // ==================== MODULE B - TIERED MEMORY ====================
@@ -2775,12 +2697,7 @@ You must output one short parenthetical task followed by the story continuation.
         { key: "seasonLength", label: "Season length", priority: 90, number: true, cardOnly: true },
         // Required: a blank row means "I did not change this", not "the year has no seasons"
         { key: "seasons", label: "Seasons", priority: 91, list: true, cardOnly: true, required: true },
-        { key: "place", label: "Location", priority: 2 },
-        { key: "arc", label: "Arc", priority: 3 },
-        { key: "threats", label: "Open threats", priority: 4, list: true },
-        { key: "debts", label: "Open debts", priority: 5, list: true },
-        { key: "factions", label: "Standing", priority: 6, map: true },
-        { key: "lost", label: "Lost to memory", priority: 7, list: true }
+        { key: "place", label: "Location", priority: 2 }
     ]);
     /**
      * Reads the world card into state
@@ -2824,15 +2741,6 @@ You must output one short parenthetical task followed by the story continuation.
                 if ((0 < parsed.length) || (field.required !== true)) {
                     world[field.key] = parsed;
                 }
-            } else if (field.map) {
-                const map = {};
-                for (const part of readList(raw, 12)) {
-                    const match = part.match(/^(.+?)\s*([+-]?\d{1,3})$/);
-                    if (match) {
-                        map[match[1].trim().slice(0, 40)] = Math.max(-99, Math.min(99, parseInt(match[2], 10)));
-                    }
-                }
-                world[field.key] = map;
             } else {
                 world[field.key] = raw.slice(0, 120);
             }
@@ -2856,9 +2764,6 @@ You must output one short parenthetical task followed by the story continuation.
             }
             if (field.list) {
                 return `${field.label}: ${(Array.isArray(value) ? value : []).join("; ")}`;
-            }
-            if (field.map) {
-                return `${field.label}: ${Object.entries(value || {}).map(([k, v]) => `${k} ${(0 <= v) ? "+" : ""}${v}`).join("; ")}`;
             }
             return `${field.label}: ${value ?? ""}`;
         }).join("\n");
@@ -2888,11 +2793,9 @@ You must output one short parenthetical task followed by the story continuation.
                 }
                 continue;
             }
-            const rendered = (
-                field.list ? (Array.isArray(value) ? value : []).join("; ")
-                : field.map ? Object.entries(value || {}).map(([k, v]) => `${k} ${(0 <= v) ? "+" : ""}${v}`).join("; ")
-                : String(value ?? "")
-            );
+            const rendered = (field.list
+                ? (Array.isArray(value) ? value : []).join("; ")
+                : String(value ?? ""));
             if (rendered !== "") {
                 lines.push({ priority: field.priority, text: `- ${field.label}: ${rendered}` });
             }
@@ -2985,146 +2888,13 @@ You must output one short parenthetical task followed by the story continuation.
         );
         return world.date;
     };
-    // ==================== MODULE E - KNOWLEDGE MODEL ====================
-    /**
-     * How far a fact travels on its own
-     * Public facts are common knowledge almost immediately; sealed facts never move unless
-     * someone carries them deliberately, which is what makes an intercepted letter matter
-     * @type {Object}
-     */
-    const VISIBILITY = Object.freeze({
-        public: 4,
-        household: 1,
-        private: 0.25,
-        sealed: 0
-    });
-    /** Phrases that classify how far a new fact should be able to travel */
-    const VISIBILITY_TABLE = Object.freeze([
-        { pattern: /\b(?:announce|proclaim|public|crowd|market|everyone|whole (?:town|city))\b/i, cls: "public" },
-        { pattern: /\b(?:secret|sealed|hidden|conceal|nobody|no one|never tell|swear)\b/i, cls: "sealed" },
-        { pattern: /\b(?:household|servant|guild|crew|family|kitchen|staff)\b/i, cls: "household" }
-    ]);
-    /** Phrases that tag what kind of event a turn contained */
-    const EVENT_TABLE = Object.freeze([
-        { pattern: /\b(?:kill|blood|blade|strike|fight|wound)\w*\b/i, tag: "violence" },
-        { pattern: /\b(?:promise|swear|vow|oath)\w*\b/i, tag: "promise" },
-        { pattern: /\b(?:pay|coin|mark|debt|owe|purse)\w*\b/i, tag: "money" },
-        { pattern: /\b(?:letter|message|note|manifest|ledger)\w*\b/i, tag: "document" },
-        { pattern: /\b(?:leave|depart|ride|sail|arrive|return)\w*\b/i, tag: "movement" },
-        { pattern: /\b(?:threat|warn|danger|hunt|search)\w*\b/i, tag: "threat" }
-    ]);
-    /**
-     * Classifies a new fact by how far it should travel
-     * @param {string} text
-     * @returns {string} A key of VISIBILITY
-     */
-    const classify = (text = "") => {
-        for (const rule of VISIBILITY_TABLE) {
-            if (rule.pattern.test(text)) {
-                return rule.cls;
-            }
-        }
-        return "private";
-    };
-    /**
-     * Tags what kind of thing happened this turn
-     * @param {string} text
-     * @returns {string}
-     */
-    const tagEvent = (text = "") => {
-        for (const rule of EVENT_TABLE) {
-            if (rule.pattern.test(text)) {
-                return rule.tag;
-            }
-        }
-        return "scene";
-    };
-    /**
-     * Trims the event log to its byte cap, oldest first
-     * @param {number} maxChars
-     * @returns {void}
-     */
-    const trimEvents = (maxChars = 3000) => {
-        let size = JSON.stringify(CH.events).length;
-        while ((size > maxChars) && (CH.events.length > 1)) {
-            CH.events.shift();
-            size = JSON.stringify(CH.events).length;
-        }
-        return;
-    };
-    /**
-     * Spreads facts to people who were not there
-     *
-     * Called once per committed turn, never on a retry, so a discarded generation cannot
-     * leak a secret that was never told
-     * @param {Object} config - Commit settings
-     * @param {string[]} agents - Everyone who could hear
-     * @returns {number} How many facts moved
-     */
-    const propagateFacts = (config = {}, agents = []) => {
-        if (!config.knows || (config.rumor <= 0)) {
-            return 0;
-        }
-        let moved = 0;
-        for (const key of Object.keys(CH.facts)) {
-            const fact = CH.facts[key];
-            if (!fact || !Array.isArray(fact.known)) {
-                continue;
-            }
-            const rate = (VISIBILITY[fact.cls] ?? 0) * (config.rumor / 100);
-            if (rate <= 0) {
-                continue;
-            }
-            for (const agentName of agents) {
-                if (fact.known.includes(agentName)) {
-                    continue;
-                }
-                if (Math.random() < rate) {
-                    fact.known.push(agentName);
-                    moved++;
-                    // Whatever they used to believe about this is now out of date
-                    if (CH.stale[agentName] && CH.stale[agentName][key]) {
-                        delete CH.stale[agentName][key];
-                    }
-                }
-            }
-        }
-        return moved;
-    };
-    /**
-     * What an agent has missed, and what they still wrongly believe
-     * @param {string} agentName
-     * @param {number} maxChars
-     * @returns {string[]} Rendered lines
-     */
-    const blindSpots = (agentName = "", maxChars = 400) => {
-        const lines = [];
-        const missed = CH.events
-            .filter(event => Array.isArray(event.a) && !event.a.includes(agentName))
-            .slice(-3);
-        for (const event of missed) {
-            lines.push(`${agentName} did not witness: ${event.tag} involving ${(event.a || []).join(" and ") || "no one known"}${event.p ? ` at ${event.p}` : ""} (${event.t})`);
-        }
-        const stale = CH.stale[agentName] || {};
-        for (const key of Object.keys(stale).slice(0, 2)) {
-            const belief = stale[key];
-            if (belief && (typeof belief.value === "string")) {
-                lines.push(`${agentName} still believes, wrongly: ${belief.value}`);
-            }
-        }
-        let total = 0;
-        return lines.filter(line => {
-            total += line.length + 3;
-            return (total <= maxChars);
-        });
-    };
     // ==================== MODULE OPERATIONS ====================
     /**
      * Applies one non-brain operation descriptor
      *
      * Every module writes through here, on the next turn, inside the same transaction as
      * the thought that accompanied it. A module that wrote directly would be a hole in the
-     * ledger: a retry would roll back the thought and leave the clock advanced
+     * ledger: a retry would roll back the thought and leave the calendar advanced
      * @param {Object} op - Operation descriptor
      * @param {Object} cfg - Commit settings captured at staging time
      * @returns {string|null} Log line, or null if the operation was refused
@@ -3140,68 +2910,6 @@ You must output one short parenthetical task followed by the story continuation.
                     return null;
                 }
                 return `world.date = ${JSON.stringify(advanceDate(days))};`;
-            }
-            if (op.op === "set") {
-                const field = WORLD_FIELDS.find(f => (f.key === op.field));
-                if (!field || (typeof op.value !== "string")) {
-                    return null;
-                }
-                CH.world[field.key] = op.value.slice(0, 120);
-                return `world.${field.key} = ${JSON.stringify(CH.world[field.key])};`;
-            }
-            if (op.op === "lose") {
-                // A thought that fell out of a brain becomes a hole in the world, not silence
-                if (typeof op.value !== "string") {
-                    return null;
-                }
-                CH.world.lost = [...CH.world.lost, op.value.slice(0, 120)].slice(-3);
-                return `world.lost.push(${JSON.stringify(op.value.slice(0, 120))});`;
-            }
-            return null;
-        }
-        if (op.mod === "event") {
-            if (op.op !== "record") {
-                return null;
-            }
-            const event = {
-                t: getActionCount(),
-                a: (Array.isArray(op.actors) ? op.actors : []).filter(a => (typeof a === "string")).slice(0, 6),
-                p: (typeof op.place === "string") ? op.place.slice(0, 60) : "",
-                tag: (typeof op.tag === "string") ? op.tag.slice(0, 24) : "scene"
-            };
-            CH.events = [...CH.events, event].slice(-200);
-            trimEvents(cfg.eventChars);
-            return `events.push({ turn: ${event.t}, tag: ${JSON.stringify(event.tag)} });`;
-        }
-        if (op.mod === "fact") {
-            if ((op.op !== "assert") || !safeKey(op.key) || (typeof op.value !== "string")) {
-                return null;
-            }
-            const previous = CH.facts[op.key];
-            const known = (Array.isArray(op.knownBy) ? op.knownBy : []).filter(a => (typeof a === "string")).slice(0, 8);
-            if (previous && (typeof previous.value === "string") && (previous.value !== op.value)) {
-                // Anyone who knew the old version and did not witness the change keeps
-                // believing it, which is the entire point of this module
-                for (const holder of (Array.isArray(previous.known) ? previous.known : [])) {
-                    if (known.includes(holder)) {
-                        continue;
-                    }
-                    CH.stale[holder] = CH.stale[holder] || {};
-                    CH.stale[holder][op.key] = { value: previous.value, turn: previous.turn };
-                }
-            }
-            CH.facts[op.key] = {
-                value: op.value.slice(0, 200),
-                turn: getActionCount(),
-                cls: Object.prototype.hasOwnProperty.call(VISIBILITY, op.cls) ? op.cls : "private",
-                known
-            };
-            // Facts are capped like everything else, oldest first
-            const keys = Object.keys(CH.facts);
-            if (keys.length > 60) {
-                for (const key of keys.sort((a, b) => (CH.facts[a].turn - CH.facts[b].turn)).slice(0, keys.length - 60)) {
-                    delete CH.facts[key];
-                }
             }
             return null;
         }
@@ -3222,11 +2930,11 @@ You must output one short parenthetical task followed by the story continuation.
      */
     const BUDGET_TABLE = Object.freeze([
         // name, ceiling on maxChars, then the budgets that apply below that ceiling
-        { name: "XS", upTo: 12000, chronicle: 350, witness: 0, injectPercent: 12 },
-        { name: "S", upTo: 32000, chronicle: 500, witness: 0, injectPercent: 20 },
-        { name: "M", upTo: 80000, chronicle: 700, witness: 1, injectPercent: 30 },
-        { name: "L", upTo: 200000, chronicle: 700, witness: 2, injectPercent: 35 },
-        { name: "XL", upTo: Infinity, chronicle: 900, witness: 99, injectPercent: 40 }
+        { name: "XS", upTo: 12000, chronicle: 350, injectPercent: 12 },
+        { name: "S", upTo: 32000, chronicle: 500, injectPercent: 20 },
+        { name: "M", upTo: 80000, chronicle: 700, injectPercent: 30 },
+        { name: "L", upTo: 200000, chronicle: 700, injectPercent: 35 },
+        { name: "XL", upTo: Infinity, chronicle: 900, injectPercent: 40 }
     ]);
     /**
      * The order in which features are given up when the context shrinks
@@ -3234,7 +2942,7 @@ You must output one short parenthetical task followed by the story continuation.
      * last things to shrink, and they never disappear entirely
      * @type {string[]}
      */
-    const DEGRADE_ORDER = Object.freeze(["witness", "chronicle"]);
+    const DEGRADE_ORDER = Object.freeze(["chronicle"]);
     /** Two consecutive turns at a new size before switching, so a wobble does not thrash */
     const PROFILE_HYSTERESIS = 2;
     /**
@@ -3457,7 +3165,6 @@ You must output one short parenthetical task followed by the story continuation.
             profile: "",
             band: "healthy",
             lean: false,
-            witness: 99,
             injectCap: Infinity
         };
         {
@@ -3484,10 +3191,6 @@ You must output one short parenthetical task followed by the story continuation.
             // A profile only ever takes away. The player's own settings stay the ceiling
             runtime.worldChars = Math.min(config.worldChars, profile.chronicle);
             capped("world block", config.worldChars, runtime.worldChars);
-            runtime.witness = profile.witness;
-            if ((config.knows === true) && (profile.witness === 0)) {
-                capped("blind spot lines", "on", "off");
-            }
             runtime.injectCap = Math.floor((maxChars || 0) * (profile.injectPercent / 100)) || Infinity;
             // Module N has no switch: a small context gets the terse register, always
             runtime.lean = ["XS", "S"].includes(profile.name);
@@ -3499,7 +3202,6 @@ You must output one short parenthetical task followed by the story continuation.
                 // Degraded and minimal both stop the extras competing for the model's
                 // attention, in the order laid down by DEGRADE_ORDER
                 runtime.lean = true;
-                runtime.witness = 0;
             }
         }
         return runtime;
@@ -3513,9 +3215,7 @@ You must output one short parenthetical task followed by the story continuation.
      */
     const degradeStep = (runtime = {}, index = 0) => {
         const feature = DEGRADE_ORDER[index];
-        if (feature === "witness") {
-            runtime.witness = 0;
-        } else if (feature === "chronicle") {
+        if (feature === "chronicle") {
             // The floor, never zero: a world nobody can see is not a world
             runtime.worldChars = Math.max(180, Math.min(runtime.worldChars, Math.floor(runtime.injectCap * 0.5)));
         }
@@ -3536,13 +3236,6 @@ You must output one short parenthetical task followed by the story continuation.
         const parts = [];
         if (config.world === true) {
             parts.push(renderWorld(config.worldChars, [], config.lean === true));
-        }
-        if ((config.knows === true) && (primary !== "")) {
-            const lines = blindSpots(primary, 240)
-                .slice(0, Number.isInteger(config.witness) ? config.witness : 99);
-            if (0 < lines.length) {
-                parts.push(`# What ${primary} does not know: [\n${lines.map(line => `- ${line}`).join("\n")}\n]\n\n`);
-            }
         }
         return parts.join("");
     };
@@ -4724,7 +4417,7 @@ Follow the format **perfectly**.
                 degradeStep(R, step);
                 overlay = buildOverlay(R, agent.name);
             }
-            // Module J: what each part of this turn cost, for /diag
+            // Module J: what each part of this turn cost, for the diagnostics card
             CH.diag.cost = {
                 world: overlay.length,
                 brains: self.length,
@@ -4995,49 +4688,30 @@ Chronicle ${version} is an AI Dungeon mod that grants memory, goals, secrets, pl
 - (true or false)
 
 🧩 Modules:
-Everything below is off until you switch it on, and safe to switch off again at any time.
+Two of these ship off, one ships on, and the rest have no switch at all.
 
 > Tiered memory with pinned core thoughts:
 - Thoughts live in three tiers: pinned core, long-term, and working
 - A full brain evicts its coldest working thought instead of asking the AI what to burn
-- Pin anything you never want forgotten with /pin, or by putting # in front of its name
+- Pin anything you never want forgotten by putting # in front of its name in the notes
 - Characters are seeded with one pinned fact taken from their own story card
 
-> Track world state (date, place, arc, factions):
-- Keeps a "Chronicle" card holding the date, location, arc, standing, debts and threats
-- The card is authoritative: edit it and Chronicle believes you
-- The date moves when the story says it moves, never once per turn
-
-> Let several present characters think at once:
-- A three character scene reads as three people instead of one and two pieces of furniture
-- Characters who act or speak are present; characters merely mentioned are not
-- One character still writes per turn, rotated toward whoever spoke last
-
-> Track who witnessed what, and what they still believe:
-- Characters know what they were present for, and stay wrong about the rest
-- Secrets spread through the household at the rate you set, not by narrative convenience
-
-> Track progress clocks and scheduled consequences:
-- Author your own clocks on the "Chronicle Clocks" card, with the phrase that advances each
-- A full clock queues a consequence, which surfaces later, optionally once a phrase is reached
-
-> Run periodic continuity audits:
-- Now and then a turn is spent checking the scene against the world card
-- Contradictions are reported to you and logged; nothing is ever corrected behind your back
-
-> Enable player commands like /help and /undo:
-- Type /help in game for the full list
-- /state, /clocks, /bonds, /who, /pin, /unpin, /forget, /undo, /date, /audit, /diag
-
-> Track relationship bonds with the player:
-- Seven rungs, from unknown to formally bound, which cannot be skipped upward
-- A betrayal may cost several rungs at once
-- The current standing lives on the character's own card and you may edit it
+> Track the in-game date and location:
+- Keeps a "Chronicle" card holding the date and where you are
+- One short line is injected each turn; the card is authoritative, so edit it freely
+- The date carries a season and a year, and the season names and length are yours to set
+- Time moves when the story says it moves, on travel and on time skips, never once per turn
 
 > Enable diagnostics and safety rails:
+- On by default, because its card is the only window into what Chronicle is doing
 - Watches the saved state size and trims the most expendable things before it overflows
 - Skips optional work rather than risk a hook timing out
-- Keeps a "Chronicle Diagnostics" card showing the last twenty transactions
+
+Always on, with no switch:
+- The transaction ledger, so retrying or erasing never rewrites what a character remembers
+- Budget autoscaling, which fits every injection to the context your model actually has
+- The compliance monitor, which stops asking a model that cannot answer the task format
+- Lean emission, which shortens every prompt when the context is small
 
 🌸 Credit:
 - Chronicle is a fork of ${ancestry} by LewdLeah, used and shared under the MIT licence
@@ -5205,17 +4879,11 @@ I hope you will have lots of fun!
      */
     const moduleScans = (prose = "") => {
         const found = [];
-        const actors = namesIn(prose);
         if (config.world === true) {
             const days = readTimePassage(prose, config.maxDays);
             if (0 < days) {
                 found.push({ mod: "world", op: "advanceDays", n: days });
             }
-        }
-        if ((config.knows === true) && (0 < actors.length)) {
-            found.push({
-                mod: "event", op: "record", actors, place: CH.world.place, tag: tagEvent(prose)
-            });
         }
         return found;
     };
@@ -5241,7 +4909,7 @@ I hope you will have lots of fun!
         // passing, a declared clock trigger and who was present are all still worth staging
         const quiet = moduleScans(text);
         if (0 < quiet.length) {
-            parkTransaction(quiet, null, IS.label, config, namesIn(text));
+            parkTransaction(quiet, null, IS.label, config);
         }
         recordTiming("output");
         return;
@@ -5569,7 +5237,6 @@ I hope you will have lots of fun!
         CH.compliance.asked = null;
     }
     // Module scans, defined above so both output paths can use them
-    const actors = namesIn(text);
     operations.push(...moduleScans(text));
     // ==================== TRANSACTION STAGING ====================
     // Stage the turn's operations instead of writing them
@@ -5613,7 +5280,7 @@ I hope you will have lots of fun!
         );
     }
     text ||= "\u200B";
-    parkTransaction(staged, agent, labelStart, config, actors);
+    parkTransaction(staged, agent, labelStart, config);
     // State is at its largest right here, with a transaction staged and not yet spent
     enforceStateBudget(commitConfig({ cfg: moduleConfig(config) }));
     recordTiming("output");
