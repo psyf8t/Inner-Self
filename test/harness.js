@@ -266,8 +266,10 @@ test("old installs calling InnerSelf() still work", () => {
 suite("1. Parity with Inner Self (300 turns, no retries)");
 
 const parity = (() => {
-    const upstream = newAdventure("upstream");
-    const chronicle = newAdventure("chronicle");
+    // Profile M: large enough that Module N leaves the prompts alone, so this is a true
+    // byte comparison rather than one taken where Chronicle deliberately says less
+    const upstream = newAdventure("upstream", { maxChars: 60000 });
+    const chronicle = newAdventure("chronicle", { maxChars: 60000 });
     seedAgents(upstream);
     seedAgents(chronicle);
     const session = new Session([upstream, chronicle]);
@@ -365,12 +367,7 @@ test("every module ships off by default", () => {
     const flags = [
         "tiered memory with pinned core thoughts",
         "track world state (date, place, arc, factions)",
-        "let several present characters think at once",
         "track who witnessed what, and what they still believe",
-        "track progress clocks and scheduled consequences",
-        "run periodic continuity audits",
-        "enable player commands like /help and /undo",
-        "track relationship bonds with the player",
         "enable diagnostics and safety rails"
     ];
     for (const flag of flags) {
@@ -908,21 +905,11 @@ const MODULE_ROWS = {
     worldChars: /^> Maximum characters of world state per turn:/,
     startDate: /^> In-game date the adventure began on:/,
     maxDays: /^> Maximum days one turn may advance:/,
-    ensemble: /^> Let several present characters think at once:/,
-    brains: /^> Maximum full brains sharing one context:/,
     knows: /^> Track who witnessed what, and what they still believe:/,
     eventChars: /^> Maximum characters of witnessed event log:/,
     rumor: /^> Chance per turn that a secret spreads to someone:/,
-    clocks: /^> Track progress clocks and scheduled consequences:/,
-    audit: /^> Run periodic continuity audits:/,
-    auditEvery: /^> Turns between continuity audits:/,
-    consoleOn: /^> Enable player commands like \/help and \/undo:/,
-    bonds: /^> Track relationship bonds with the player:/,
-    bondTurns: /^> Minimum turns between bond advances:/,
     diag: /^> Enable diagnostics and safety rails:/,
     cooldown: /^> Turns to stop asking after the model cannot answer:/,
-    canary: /^> Check that context injections are landing at all:/,
-    lean: /^> Use terse prompts when context or compliance is tight:/,
     timeBudget: /^> Milliseconds a hook may spend before skipping extras:/,
     stateChars: /^> Maximum characters of saved adventure state:/
 };
@@ -1095,7 +1082,7 @@ test("compression merges two long-term thoughts into one", () => {
 suite("6. Module C — world chronicle");
 
 test("the world card is created, injected, and capped", () => {
-    const { adventure, session } = moduleAdventure({ world: "true", worldChars: "300" });
+    const { adventure, session } = moduleAdventure({ world: "true", worldChars: "300" }, { maxChars: 60000 });
     const card = cardTitled(adventure, "Chronicle");
     assert(card, "no world card was created");
     card.description = [
@@ -1152,56 +1139,11 @@ test("hand edits to the world card win over stored state", () => {
     assert(step.contextOut[0].includes("the lighthouse"), "the edited location was not injected");
 });
 
-suite("7. Module D — ensemble");
-
-test("characters who act are present, characters who are mentioned are not", () => {
-    // Profile L, so Module K allows three concurrent brains
-    const { adventure, session } = moduleAdventure({ ensemble: "true", brains: "3" }, { maxChars: 150000 });
-    // Give all three a mind, so the only thing under test is who gets to use one
-    session.play("> You spend the morning with Leah, Maren and Silas.", "do");
-    for (const who of AGENTS) {
-        const card = brainCardOf(adventure, who) || (() => {
-            adventure.storyCards.push({
-                id: `brain-${who}`, keys: JSON.stringify({ agent: who }), entry: "",
-                type: "Brain", title: who, description: ""
-            });
-            return brainCardOf(adventure, who);
-        })();
-        card.description = `standing_order: 5 → I am ${who}, and I keep my own counsel about the manifests.`;
-    }
-    // Leah and Maren act; Silas is only spoken about
-    session.force("Leah sets down the ledger. Maren answers from the doorway, laughing about the letter from Silas.");
-    session.play("> You wait for an answer.", "do");
-    const step = session.play("> You watch them both.", "do");
-    const context = step.contextOut[0];
-    const blocks = (context.match(/brain and inner self: \[/g) || []).length;
-    assert(1 < blocks, `expected more than one brain in context, found ${blocks}`);
-    assert(context.includes("Leah") && context.includes("Maren"), "an acting character was left out");
-    assert(
-        !/# Silas's brain and inner self/.test(context),
-        "a merely mentioned character was treated as present"
-    );
-});
-
-test("only one character writes per turn, whatever the scene", () => {
-    const { adventure, session } = moduleAdventure({ ensemble: "true", brains: "3" });
-    for (let i = 0; i < 12; i++) {
-        session.force(`Leah speaks first. Maren answers. Silas shrugs at page ${i}.`);
-        session.play(`> You listen to all three, round ${i}.`, "do");
-        const pending = adventure.state.CHRONICLE.pending;
-        if (pending) {
-            const writers = new Set(pending.ops.filter(op => (op.mod === "brain")).map(op => op.agent));
-            assert(writers.size <= 1, `two characters wrote in one turn: ${[...writers].join(", ")}`);
-        }
-    }
-    assertEqual(adventure.throws.length, 0, "hooks threw during an ensemble scene");
-});
-
 suite("8. Module E — knowledge model");
 
 test("an absent character is told what they did not witness", () => {
     // Profile L, so Module K allows witness lines; at S they are the first thing dropped
-    const { adventure, session } = moduleAdventure({ knows: "true", ensemble: "true", world: "true" }, { maxChars: 150000 });
+    const { adventure, session } = moduleAdventure({ knows: "true", world: "true" }, { maxChars: 150000 });
     // Leah and Maren do something Silas is not there for
     for (let i = 0; i < 4; i++) {
         session.force(`(sealed_letter = \`I watched Maren hide the letter under the counter.\`) Leah hands Maren the sealed letter. Round ${i}.`);
@@ -1229,230 +1171,11 @@ test("the event log stays inside its byte cap", () => {
     assert(size <= 500, `the event log grew to ${size} chars`);
 });
 
-suite("9. Module F — clocks and consequences");
-
-test("a clock advances only on its declared trigger, and only once accepted", () => {
-    const { adventure, session } = moduleAdventure({ clocks: "true", world: "true" });
-    const card = cardTitled(adventure, "Chronicle Clocks");
-    assert(card, "no clocks card was created");
-    card.description = [
-        "silas_war: 0/2",
-        "  trigger: the watch searches the barge",
-        "  consequence: Silas moves against the watch openly",
-        "  reset: false"
-    ].join("\n");
-    // A tense scene with no trigger phrase must not move the clock
-    session.force("Leah watches the wharf. Nothing happens, tensely.");
-    session.play("> You wait.", "do");
-    session.play("> You keep waiting.", "do");
-    assertEqual(adventure.state.CHRONICLE.clocks.silas_war, undefined, "the clock advanced on vibes");
-    // The declared trigger, staged and then accepted
-    session.force("At dawn the watch searches the barge, plank by plank.");
-    session.play("> You step back.", "do");
-    session.play("> You say nothing.", "do");
-    assertEqual(
-        adventure.state.CHRONICLE.clocks.silas_war && adventure.state.CHRONICLE.clocks.silas_war.value, 1,
-        `expected the clock at 1, got ${JSON.stringify(adventure.state.CHRONICLE.clocks.silas_war)}`
-    );
-});
-
-test("a full clock queues its consequence, which then surfaces exactly once", () => {
-    const { adventure, session } = moduleAdventure({ clocks: "true", world: "true" });
-    const card = cardTitled(adventure, "Chronicle Clocks");
-    card.description = [
-        "silas_war: 0/1",
-        "  trigger: the watch searches the barge",
-        "  consequence: Silas moves against the watch openly",
-        "  reset: false"
-    ].join("\n");
-    session.force("At dawn the watch searches the barge, plank by plank.");
-    const trigger = session.play("> You step back.", "do");
-    // The clock fills when that turn commits, which is during the next turn's input hook,
-    // so the directive can surface as early as that same turn's context
-    let surfaced = /Bring this to the surface now/.test(trigger.contextOut[0]) ? 1 : 0;
-    const settle = session.play("> You say nothing.", "do");
-    surfaced += /Bring this to the surface now/.test(settle.contextOut[0]) ? 1 : 0;
-    for (let i = 0; i < 6; i++) {
-        const step = session.play(`> You walk on, ${i}.`, "do");
-        if (/Bring this to the surface now/.test(step.contextOut[0])) {
-            surfaced++;
-        }
-    }
-    assert(0 < surfaced, "the consequence never surfaced");
-    session.play("> You stop.", "do");
-    assertEqual(
-        adventure.state.CHRONICLE.queue.filter(item => !item.fired).length, 0,
-        "the consequence stayed in the queue after firing"
-    );
-    assert(surfaced <= 3, `the same consequence surfaced ${surfaced} turns running`);
-});
-
-suite("10. Module G — continuity auditor");
-
-test("an audit runs on schedule and reports without correcting", () => {
-    // Module K sets a floor on the audit interval per profile and never lowers it, so an
-    // interval of 10 becomes 75 at profile L. The wait is the feature working
-    const { adventure, session } = moduleAdventure({ audit: "true", auditEvery: "10", world: "true" }, { maxChars: 150000 });
-    let audited = false;
-    for (let i = 0; (i < 120) && !audited; i++) {
-        const step = session.play(`> You go about the day, ${i}.`, "do");
-        if (step.generation.task === "audit") {
-            audited = true;
-        }
-    }
-    assert(audited, "no audit was ever requested");
-    session.play("> You pause.", "do");
-    session.play("> You pause again.", "do");
-    const card = cardTitled(adventure, "Chronicle Continuity Log");
-    assert(card, "no continuity log card");
-    assert(
-        /Turn \d+:|No contradictions/.test(card.description),
-        `the log card says nothing useful: ${JSON.stringify(card.description.slice(0, 120))}`
-    );
-    assertEqual(adventure.throws.length, 0, "the auditor threw");
-});
-
-test("a reported contradiction reaches the player and changes nothing on its own", () => {
-    const { adventure, session } = moduleAdventure({ audit: "true", auditEvery: "10", world: "true" });
-    const worldCard = cardTitled(adventure, "Chronicle");
-    worldCard.description = "Date: Day 4\nLocation: Fenwater Row\nArc: \nOpen threats: \nOpen debts: \nStanding: \nLost to memory: ";
-    session.force("(audit = `The chronicle says Day 4, but the scene calls it midwinter.`) Iris walks on.");
-    session.play("> You keep walking.", "do");
-    session.play("> You keep walking again.", "do");
-    assert(
-        /contradiction/i.test(String(adventure.sandbox.state.message || "")),
-        `the player was not told: ${JSON.stringify(adventure.sandbox.state.message)}`
-    );
-    assertEqual(adventure.state.CHRONICLE.world.date, "Day 4", "the auditor corrected the world by itself");
-});
-
-suite("11. Module H — player console");
-
-test("a command answers the player and stops the turn", () => {
-    const { adventure } = moduleAdventure({ consoleOn: "true", world: "true", clocks: "true" });
-    const out = adventure.hook("input", "/state");
-    assert(out !== "", "the input hook returned an empty string");
-    assert(/Date:/.test(String(adventure.sandbox.state.message)), "no answer was given");
-    adventure.push(out, "do");
-    adventure.hook("context", buildContext(adventure));
-    assertEqual(adventure.sandbox.stop, true, "the turn was not stopped");
-});
-
-test("unknown commands fall through to the story untouched", () => {
-    const { adventure } = moduleAdventure({ consoleOn: "true" });
-    const before = String(adventure.sandbox.state.message || "");
-    const out = adventure.hook("input", "/dance with Leah");
-    assertEqual(out, "/dance with Leah", "an unknown command was swallowed");
-    assertEqual(String(adventure.sandbox.state.message || ""), before, "an unknown command answered anyway");
-});
-
-test("/pin, /forget and /undo do what they say", () => {
-    const { adventure, session } = moduleAdventure({ consoleOn: "true", tiers: "true" });
-    session.play("> You talk with Leah about the crates.", "do");
-    const card = brainCardOf(adventure, "Leah");
-    assert(card, "no brain card");
-    card.description = "crate_count: 3 → I counted nineteen crates where the manifest claims twenty.";
-    adventure.hook("input", "/pin Leah crate_count");
-    assert(
-        brainCardOf(adventure, "Leah").description.includes("#crate_count"),
-        `/pin did not pin: ${brainCardOf(adventure, "Leah").description}`
-    );
-    assert(/pinned/i.test(String(adventure.sandbox.state.message)), "/pin said nothing useful");
-    adventure.hook("input", "/unpin Leah crate_count");
-    assert(
-        !brainCardOf(adventure, "Leah").description.includes("#crate_count"),
-        "/unpin did not unpin"
-    );
-    adventure.hook("input", "/forget Leah crate_count");
-    assert(
-        !brainCardOf(adventure, "Leah").description.includes("crate_count"),
-        "/forget did not forget"
-    );
-    // /undo restores the last committed transaction
-    const undoable = adventure.state.CHRONICLE.undo;
-    adventure.hook("input", "/undo");
-    const message = String(adventure.sandbox.state.message);
-    assert(
-        undoable ? /Reverted/.test(message) : /nothing to undo/i.test(message),
-        `/undo said: ${message}`
-    );
-});
-
-test("/who, /bonds, /clocks, /diag and /help all answer", () => {
-    const { adventure, session } = moduleAdventure({
-        consoleOn: "true", ensemble: "true", bonds: "true", clocks: "true", diag: "true"
-    });
-    session.force("Leah speaks. Maren answers.");
-    session.play("> You listen.", "do");
-    for (const [command, expected] of [
-        ["/help", /Chronicle commands/],
-        ["/who", /full brain|Nobody/],
-        ["/bonds", /Leah/],
-        ["/clocks", /clock|Coming|No clocks/i],
-        ["/diag", /State: \d+/]
-    ]) {
-        const out = adventure.hook("input", command);
-        assert(out !== "", `${command} returned an empty string`);
-        assert(
-            expected.test(String(adventure.sandbox.state.message)),
-            `${command} answered: ${JSON.stringify(String(adventure.sandbox.state.message).slice(0, 120))}`
-        );
-    }
-    assertEqual(adventure.throws.length, 0, "a command threw");
-});
-
-suite("12. Module I — bonds");
-
-test("a bond advances one rung at a time and respects its cooldown", () => {
-    const { adventure, session } = moduleAdventure({ bonds: "true", bondTurns: "0" });
-    session.force("(bond = `formally bound`) Leah looks at Iris for a long moment.");
-    session.play("> You offer your hand.", "do");
-    session.play("> You wait.", "do");
-    const moved = Object.entries(adventure.state.CHRONICLE.bonds).filter(([, b]) => (0 < b.stage));
-    assertEqual(moved.length, 1, `expected one standing to move: ${JSON.stringify(adventure.state.CHRONICLE.bonds)}`);
-    const [who] = moved[0];
-    assertEqual(
-        adventure.state.CHRONICLE.bonds[who].stage, 1,
-        `a bond skipped rungs: ${JSON.stringify(adventure.state.CHRONICLE.bonds[who])}`
-    );
-    // With a cooldown in force, the next advance must not land
-    editSetting(adventure, MODULE_ROWS.bondTurns, "500");
-    session.force(`(bond = \`sought out\`) ${who} steps closer.`);
-    session.play(`> You speak gently to ${who}.`, "do");
-    session.play(`> You wait again with ${who}.`, "do");
-    assertEqual(adventure.state.CHRONICLE.bonds[who].stage, 1, "the cooldown was ignored");
-});
-
-test("a betrayal may drop several rungs at once", () => {
-    const { adventure, session } = moduleAdventure({ bonds: "true", bondTurns: "0" });
-    // Every character starts high, so whichever one the scene triggers has something to lose
-    for (const who of AGENTS) {
-        adventure.state.CHRONICLE.bonds[who] = { stage: 5, turn: 0 };
-    }
-    session.force("(bond = `broken`) Leah turns away without a word.");
-    session.play("> You lie to her.", "do");
-    session.play("> You watch her go.", "do");
-    const dropped = Object.entries(adventure.state.CHRONICLE.bonds).filter(([, b]) => (b.stage < 5));
-    assertEqual(
-        dropped.length, 1,
-        `a betrayal did not cost anything: ${JSON.stringify(adventure.state.CHRONICLE.bonds)}`
-    );
-});
-
-test("the current standing is injected as a fact in that character's head", () => {
-    const { adventure, session } = moduleAdventure({ bonds: "true" });
-    const step = session.play("> You sit with Leah.", "do");
-    assert(
-        /Standing with Iris: (unknown|noticed)/.test(step.contextOut[0]),
-        "the bond was not injected into the brain block"
-    );
-});
-
 suite("13. Module J — diagnostics and safety rails");
 
 test("the state budget warns, then trims, and never overflows", () => {
     const { adventure, session } = moduleAdventure({
-        diag: "true", stateChars: "8000", knows: "true", world: "true", clocks: "true", tiers: "true"
+        diag: "true", stateChars: "8000", knows: "true", world: "true", tiers: "true"
     });
     for (const action of actionPlan(200)) {
         session.play(action.input, action.type);
@@ -1468,7 +1191,7 @@ test("the state budget warns, then trims, and never overflows", () => {
 test("optional work is skipped rather than risking the hook timeout", () => {
     // A clock that advances a second per call makes every hook look slow
     const { adventure, session } = moduleAdventure(
-        { diag: "true", timeBudget: "100", audit: "true", auditEvery: "1", tiers: "true" },
+        { diag: "true", timeBudget: "100", tiers: "true" },
         { clockStepMs: 1000, maxChars: 150000 }
     );
     session.play("> You keep working.", "do");
@@ -1484,8 +1207,13 @@ test("the diagnostics card lists recent transactions", () => {
     }
     const card = cardTitled(adventure, "Chronicle Diagnostics");
     assert(card, "no diagnostics card");
-    assert(/commits: \d+/.test(card.description), "no transaction counts");
+    assert(/transactions: \d+ committed/.test(card.description), "no transaction counts");
     assert(/last transactions:/.test(card.description), "no transaction list");
+    // The card is where the console used to be, so it answers the same questions
+    assert(/context: \d+ chars, profile [A-Z]+/.test(card.description), "no context line");
+    assert(/overruled by that profile:/.test(card.description), "no override line");
+    assert(/model compliance: \w+/.test(card.description), "no compliance line");
+    assert(/last turn injected: world \d+/.test(card.description), "no per-module cost line");
     assert(
         card.description.split("\n").filter(line => /turn \d+/.test(line)).length <= 20,
         "the diagnostics card listed more than twenty transactions"
@@ -1493,7 +1221,7 @@ test("the diagnostics card lists recent transactions", () => {
 });
 
 test("story cards are found through the index instead of a full scan", () => {
-    const { adventure, session } = moduleAdventure({ world: "true", clocks: "true", diag: "true" });
+    const { adventure, session } = moduleAdventure({ world: "true", diag: "true" });
     session.play("> You look at the river.", "do");
     const index = adventure.state.CHRONICLE.index;
     assert(Object.keys(index).length > 0, "nothing was indexed");
@@ -1503,156 +1231,12 @@ test("story cards are found through the index instead of a full scan", () => {
     }
 });
 
-suite("13b. Late additions across modules B, F and I");
-
-test("a character is seeded with one pinned fact from their own story card", () => {
-    const { adventure, session } = moduleAdventure({ tiers: "true" });
-    // The seed card the scenario creator wrote, renamed from "@Leah" on the first turn
-    const source = adventure.storyCards.find(c => (c.title === "Leah"));
-    assert(source, "the @Leah card was never adopted");
-    source.entry = "Leah keeps the river guild's ledgers and has never once been caught short. She dislikes the watch.";
-    session.play("> You greet Leah at the counting house.", "do");
-    session.play("> You ask Leah for the tally.", "do");
-    session.play("> You wait while Leah counts.", "do");
-    const card = brainCardOf(adventure, "Leah");
-    assert(card, "no brain card");
-    assert(
-        card.description.includes("#defining_fact"),
-        `nothing was seeded:\n${card.description.slice(0, 300)}`
-    );
-    assert(
-        card.description.includes("river guild"),
-        "the seed did not come from the character's own card"
-    );
-});
-
-test("the core tier is capped by demotion, never by deletion", () => {
-    const { adventure, session } = moduleAdventure({ tiers: "true", core: "2" });
-    session.play("> You sit with Leah.", "do");
-    const card = brainCardOf(adventure, "Leah");
-    card.description = [
-        "#first_pin: 1 → I was born on the water and I will die on it.",
-        "#second_pin: 2 → I have never once been caught short at the counting house.",
-        "#third_pin: 3 → I do not trust the watch, and I never will.",
-        "#fourth_pin: 4 → Iris is the only factor who ever asked my name."
-    ].join("\n\n");
-    session.play("> You talk with Leah a while.", "do");
-    session.play("> You talk with Leah some more.", "do");
-    const after = brainCardOf(adventure, "Leah").description;
-    const pinned = (after.match(/#[a-z_]+_pin/g) || []).length;
-    assert(pinned <= 2, `the core cap was not enforced, ${pinned} thoughts still pinned`);
-    // Demoted, not destroyed: every thought is still there under a bare name
-    for (const text of ["born on the water", "caught short", "trust the watch", "asked my name"]) {
-        assert(after.includes(text), `a demoted thought was destroyed: ${text}`);
-    }
-});
-
-test("a bond is mirrored into the reserved namespace, and a hand edit wins", () => {
-    const { adventure, session } = moduleAdventure({ bonds: "true", bondTurns: "0", tiers: "true" });
-    session.force("(bond = `noticed`) Leah looks up as Iris passes.");
-    session.play("> You pass her desk.", "do");
-    session.play("> You look back.", "do");
-    const [who] = Object.entries(adventure.state.CHRONICLE.bonds).find(([, b]) => (0 < b.stage)) || [];
-    assert(who, `no standing moved: ${JSON.stringify(adventure.state.CHRONICLE.bonds)}`);
-    const card = brainCardOf(adventure, who);
-    assert(card, `no brain card for ${who}`);
-    assert(
-        /#bond: standing with the player: noticed/.test(card.description),
-        `the bond was not mirrored onto the card:\n${card.description.slice(0, 300)}`
-    );
-    // The player rewrites it by hand, and Chronicle believes them
-    card.description = card.description.replace(
-        /#bond: standing with the player: [a-z ]+/,
-        "#bond: standing with the player: defended publicly"
-    );
-    session.play(`> You speak with ${who}.`, "do");
-    session.play(`> You wait with ${who}.`, "do");
-    assertEqual(
-        adventure.state.CHRONICLE.bonds[who].stage, 4,
-        `the hand edit did not win: ${JSON.stringify(adventure.state.CHRONICLE.bonds[who])}`
-    );
-});
-
-test("a consequence can wait for a phrase rather than a turn number", () => {
-    const { adventure, session } = moduleAdventure({ clocks: "true", world: "true" });
-    const card = cardTitled(adventure, "Chronicle Clocks");
-    card.description = [
-        "letter_returns: 0/1",
-        "  trigger: the letter leaves the wharf",
-        "  consequence: the letter arrives in the wrong hands",
-        "  after: at the magistrate",
-        "  reset: false"
-    ].join("\n");
-    session.force("At dusk the letter leaves the wharf in a stranger's coat.");
-    session.play("> You watch it go.", "do");
-    session.play("> You say nothing.", "do");
-    assert(0 < adventure.state.CHRONICLE.queue.length, "the clock did not fill");
-    // The condition has not been met, so nothing surfaces however long we wait
-    let early = 0;
-    for (let i = 0; i < 5; i++) {
-        const step = session.play(`> You go about your day, ${i}.`, "do");
-        if (/Bring this to the surface now/.test(step.contextOut[0])) {
-            early++;
-        }
-    }
-    assertEqual(early, 0, "the consequence surfaced before its condition was met");
-    // Now the story reaches the phrase
-    session.force("Iris finally stands at the magistrate's door with Leah.");
-    session.play("> You climb the steps.", "do");
-    let late = 0;
-    for (let i = 0; i < 3; i++) {
-        const step = session.play(`> You wait in the hall, ${i}.`, "do");
-        if (/Bring this to the surface now/.test(step.contextOut[0])) {
-            late++;
-        }
-    }
-    assert(0 < late, "the consequence never surfaced once its condition was met");
-});
-
-test("/undo reverts the whole transaction, not only its thought", () => {
-    const { adventure, session } = moduleAdventure({
-        consoleOn: "true", world: "true", clocks: "true", bonds: "true", bondTurns: "0"
-    });
-    const worldCard = cardTitled(adventure, "Chronicle");
-    worldCard.description = "Date: Day 4\nLocation: Fenwater Row\nArc: \nOpen threats: \nOpen debts: \nStanding: \nLost to memory: ";
-    session.play("> You settle in for the night.", "do");
-    // A turn that moves the day and writes a thought, then is accepted
-    session.force("(night_watch = `I will keep the ledger under my own pillow tonight.`) The next morning Leah is already counting.");
-    session.play("> You sleep.", "do");
-    // Plain prose, so this turn stages nothing of its own and /undo has the night to revert
-    // rather than whatever happened last
-    session.force("Leah says nothing at all.");
-    session.play("> You wake with Leah.", "do");
-    assertEqual(adventure.state.CHRONICLE.world.date, "Day 5", "the day did not move");
-    adventure.hook("input", "/undo");
-    assertEqual(
-        adventure.state.CHRONICLE.world.date, "Day 4",
-        `the calendar was not rolled back: ${adventure.state.CHRONICLE.world.date}`
-    );
-    assert(
-        /Reverted the last change to .*the world/.test(String(adventure.sandbox.state.message)),
-        `/undo said: ${adventure.sandbox.state.message}`
-    );
-    assertEqual(adventure.throws.length, 0, "/undo threw");
-});
-
 suite("14. Everything on at once");
 
 test("300 turns with every module on, retries and all, stays sane", () => {
     const { adventure, session } = moduleAdventure({
-        tiers: "true", world: "true", ensemble: "true", knows: "true", clocks: "true",
-        audit: "true", auditEvery: "40", consoleOn: "true", bonds: "true", bondTurns: "50",
-        diag: "true", brainChars: "1200", stateChars: "40000"
+        tiers: "true", world: "true", knows: "true", diag: "true", brainChars: "1200", stateChars: "40000"
     });
-    const clockCard = cardTitled(adventure, "Chronicle Clocks");
-    if (clockCard) {
-        clockCard.description = [
-            "wharf_pressure: 0/4",
-            "  trigger: the watch searches the barge",
-            "  consequence: the guild closes the wharf to the watch",
-            "  reset: true"
-        ].join("\n");
-    }
     const plan = actionPlan(300);
     plan.forEach((action, i) => {
         if ((i % 37) === 11) {
@@ -1683,14 +1267,14 @@ test("300 turns with every module on, retries and all, stays sane", () => {
     assert(ch.events.length >= 0, "events went missing");
     // Every module left something behind
     assert(cardTitled(adventure, "Chronicle"), "no world card");
-    assert(cardTitled(adventure, "Chronicle Clocks"), "no clocks card");
     assert(cardTitled(adventure, "Chronicle Diagnostics"), "no diagnostics card");
+    assert(!cardTitled(adventure, "Chronicle Clocks"), "a deleted module left a card behind");
+    assert(!cardTitled(adventure, "Chronicle Continuity Log"), "a deleted module left a card behind");
 });
 
 test("with every module on, hooks stay well inside the two second ceiling", () => {
     const { adventure, session } = moduleAdventure({
-        tiers: "true", world: "true", ensemble: "true", knows: "true", clocks: "true",
-        audit: "true", consoleOn: "true", bonds: "true", diag: "true"
+        tiers: "true", world: "true", knows: "true", diag: "true"
     });
     const times = [];
     const original = adventure.hook.bind(adventure);
@@ -1717,9 +1301,8 @@ function budgetRun(maxChars, { turns = 300, oscillate = null, modules = {} } = {
     // Everything on, so the injection targets are asserted under the full load rather
     // than a convenient subset of it
     const { adventure, session } = moduleAdventure({
-        lean: "true", world: "true", ensemble: "true", knows: "true",
-        clocks: "true", audit: "true", tiers: "true", diag: "true", bonds: "true",
-        consoleOn: "true", canary: "true", ...modules
+        world: "true", knows: "true",
+        tiers: "true", diag: "true", ...modules
     }, { maxChars });
     const card = brainCardOf(adventure, "Leah");
     if (card) {
@@ -1813,7 +1396,7 @@ suite("16. Module L — compliance monitor");
 /** Plays a session against a model that fails the format at the given rate */
 function complianceRun(sloppy, turns = 120) {
     // Module L has no switch; only its cooldown is configurable
-    const { adventure, session } = moduleAdventure({ lean: "true", cooldown: "25" });
+    const { adventure, session } = moduleAdventure({ cooldown: "25" });
     session.sloppy = sloppy;
     for (const action of actionPlan(turns)) {
         session.play(action.input, action.type);
@@ -1904,72 +1487,6 @@ test("recovery is gradual, one band at a time", () => {
     );
 });
 
-suite("17. Module M — injection canary");
-
-test("a working context channel is confirmed, and nothing changes", () => {
-    const { adventure, session } = moduleAdventure({ canary: "true", world: "true" });
-    for (let i = 0; i < 30; i++) {
-        session.play(`> You go about the day with Leah, ${i}.`, "do");
-    }
-    assertEqual(adventure.state.CHRONICLE.canary.state, "landing", "a working channel was not confirmed");
-    assertEqual(
-        String((adventure.sandbox.state.memory || {}).frontMemory || ""), "",
-        "the fallback channel was used despite the context working"
-    );
-});
-
-test("a read-only context is detected, and the world reaches the model anyway", () => {
-    const { adventure, session } = moduleAdventure({ canary: "true", world: "true", bonds: "true" });
-    const worldCard = cardTitled(adventure, "Chronicle");
-    worldCard.description = "Date: Day 9\nLocation: the lighthouse stair\nArc: \nOpen threats: \nOpen debts: \nStanding: \nLost to memory: ";
-    // Optimized Context: everything the context hook returns is thrown away
-    adventure.readOnlyContext = true;
-    let seen = "";
-    for (let i = 0; (i < 60) && (adventure.state.CHRONICLE.canary.state !== "blocked"); i++) {
-        const step = session.play(`> You climb with Leah, ${i}.`, "do");
-        seen = step.contextOut[0];
-    }
-    assertEqual(
-        adventure.state.CHRONICLE.canary.state, "blocked",
-        "a discarded context channel was never detected"
-    );
-    assert(
-        /Optimized Context/.test(String(adventure.sandbox.state.message || "")),
-        `the player was not told what it costs them: ${JSON.stringify(adventure.sandbox.state.message)}`
-    );
-    // The world now travels by the only channel left
-    const step = session.play("> You reach the top with Leah.", "do");
-    const front = String((adventure.state.memory || {}).frontMemory || "");
-    assert(/\[Chronicle\]/.test(front), `the fallback channel is empty: ${JSON.stringify(front)}`);
-    assert(/Day 9|lighthouse/.test(front), `the world did not reach the fallback: ${JSON.stringify(front)}`);
-    assert(
-        /Day 9|lighthouse/.test(modelSees(adventure, step.contextIn[0], step.contextOut[0])),
-        "the model still cannot see the world"
-    );
-    assertEqual(adventure.throws.length, 0, "the fallback threw");
-    assert(seen !== null, "no context was captured");
-});
-
-test("the fallback is cleared again if the channel starts working", () => {
-    const { adventure, session } = moduleAdventure({ canary: "true", world: "true" });
-    adventure.readOnlyContext = true;
-    for (let i = 0; (i < 60) && (adventure.state.CHRONICLE.canary.state !== "blocked"); i++) {
-        session.play(`> You wait with Leah, ${i}.`, "do");
-    }
-    assertEqual(adventure.state.CHRONICLE.canary.state, "blocked", "setup did not reach blocked");
-    // The player turns Optimized Context off again
-    adventure.readOnlyContext = false;
-    for (let i = 0; (i < 40) && (adventure.state.CHRONICLE.canary.state !== "landing"); i++) {
-        session.play(`> You try again with Leah, ${i}.`, "do");
-    }
-    assertEqual(adventure.state.CHRONICLE.canary.state, "landing", "a restored channel was not noticed");
-    session.play("> You carry on with Leah.", "do");
-    assertEqual(
-        String((adventure.state.memory || {}).frontMemory || ""), "",
-        "the fallback kept writing after the channel came back"
-    );
-});
-
 suite("18. Module N — lean emission");
 
 test("XS keeps total injection under 12% of the context, S under 20%", () => {
@@ -1986,7 +1503,7 @@ test("XS keeps total injection under 12% of the context, S under 20%", () => {
 });
 
 test("lean prompts are terse, and still answerable", () => {
-    const { adventure, session } = moduleAdventure({ lean: "true" }, { maxChars: 8000 });
+    const { adventure, session } = moduleAdventure({ }, { maxChars: 8000 });
     let leanSeen = false;
     let answered = 0;
     for (let i = 0; i < 40; i++) {
@@ -2057,36 +1574,6 @@ test("every staging is instrumented, so the open question can be answered from a
         assert(typeof entry.h === "string", "a staging has no text fingerprint");
     }
     assert(stagings.length <= 8, "the staging log grew past its cap");
-});
-
-suite("20. Module H — native command collisions");
-
-test("commands the platform owns are never swallowed", () => {
-    const { adventure } = moduleAdventure({ consoleOn: "true" });
-    for (const native of ["/reset", "/retry", "/revert", "/erase", "/remember the door", "/alter this"]) {
-        const before = String(adventure.sandbox.state.message || "");
-        const out = adventure.hook("input", native);
-        assertEqual(out, native, `${native} was rewritten by the console`);
-        assertEqual(
-            String(adventure.sandbox.state.message || ""), before,
-            `${native} was answered by the console`
-        );
-        assertEqual(adventure.state.CHRONICLE.console.stop, false, `${native} stopped the turn`);
-    }
-});
-
-test("/diag reports context, compliance, landing and per-module cost", () => {
-    const { adventure, session } = moduleAdventure({
-        consoleOn: "true", canary: "true", world: "true", diag: "true"
-    }, { maxChars: 60000 });
-    for (let i = 0; i < 6; i++) {
-        session.play(`> You work with Leah, ${i}.`, "do");
-    }
-    adventure.hook("input", "/diag");
-    const report = String(adventure.sandbox.state.message || "");
-    for (const expected of [/Context: \d+ chars, profile [A-Z]+/, /Model compliance: \w+/, /Injections landing: \w+/, /Last turn cost: world \d+/]) {
-        assert(expected.test(report), `/diag is missing ${expected}:\n${report}`);
-    }
 });
 
 // ---------------------------------------------------------------- 21. config card contract
@@ -2445,25 +1932,29 @@ test("an absent detail row reads as its documented default, not as zero or false
     assert(staged.cfg.brainChars !== 0, "an absent row was read as zero");
 });
 
-test("the spill card is created when needed and removed when not", () => {
+test("the surviving rows fit one module card, and the spill mechanism still guards them", () => {
     const adventure = newAdventure("chronicle");
     adventure.hook("context", "Recent Story:\nnothing yet.");
     const spillTitle = () => moduleCards(adventure).map(c => c.title).filter(t => /\(2\)/.test(t));
     assertEqual(spillTitle().length, 0, "a spill card existed with every module off");
     setToggles(adventure, () => true);
     setToggles(adventure, () => true);
-    assertEqual(spillTitle().length, 1, "no spill card appeared with every module on");
-    // A value set on the spill card survives a round trip
-    editSetting(adventure, MODULE_ROWS.lean, "false");
+    // After the cut the surviving rows fit on one card even with everything switched on,
+    // so no spill is expected. The mechanism stays because it is what makes overflow
+    // impossible rather than unlikely, and the budget assertion above is what proves it
+    assertEqual(spillTitle().length, 0, "a spill card appeared that the row count does not need");
+    for (const card of configCards(adventure)) {
+        assert(card.entry.length <= ENTRY_BUDGET, `${card.title} is ${card.entry.length} chars`);
+    }
+    // A value set on the module card survives a round trip
+    editSetting(adventure, MODULE_ROWS.core, "7");
     adventure.hook("context", "Recent Story:\nnothing yet.");
     assertEqual(
-        readSettings(adventure)["use terse prompts when context or compliance is tight"], "false",
-        "a value set on the spill card was lost"
+        readSettings(adventure)["maximum pinned core thoughts per character"], "7",
+        "a value set on the module card was lost"
     );
-    // And when the modules go away, so does the spill card
     setToggles(adventure, () => false);
     setToggles(adventure, () => false);
-    assertEqual(spillTitle().length, 0, "the spill card outlived its rows");
     assertEqual(adventure.throws.length, 0, "splitting threw");
 });
 
@@ -2495,23 +1986,17 @@ test("a single oversized legacy card migrates into the split layout with its val
         "> Maximum characters of world state per turn: 900",
         "> In-game date the adventure began on: \"Harvest Eve\"",
         "> Maximum days one turn may advance: 14",
-        "> Let several present characters think at once: false",
-        "> Maximum full brains sharing one context: 4",
         "> Track who witnessed what, and what they still believe: true",
         "> Maximum characters of witnessed event log: 5000",
         "> Chance per turn that a secret spreads to someone: 25%",
-        "> Track progress clocks and scheduled consequences: true",
-        "> Run periodic continuity audits: false",
-        "> Turns between continuity audits: 200",
-        "> Enable player commands like /help and /undo: true",
-        "> Track relationship bonds with the player: false",
-        "> Minimum turns between bond advances: 300",
         "> Enable diagnostics and safety rails: true",
         "> Milliseconds a hook may spend before skipping extras: 900",
         "> Maximum characters of saved adventure state: 50000",
         "> Turns to stop asking after the model cannot answer: 40",
-        "> Check that context injections are landing at all: true",
-        "> Use terse prompts when context or compliance is tight: false"
+        // Rows from modules that no longer exist. They must not survive the rewrite
+        "> Track progress clocks and scheduled consequences: true",
+        "> Enable player commands like /help and /undo: true",
+        "> Check that context injections are landing at all: true"
     ];
     // Collapse to one card, the old way, and delete the module cards
     for (const card of moduleCards(adventure)) {
@@ -2544,23 +2029,13 @@ test("a single oversized legacy card migrates into the split layout with its val
     ]) {
         assertEqual(after[label], want, `"${label}" was lost migrating off the legacy card`);
     }
-    // The legacy card also carried values for modules that are switched off. Those rows are
-    // not shown while the module is off, but the values are not lost: switch the module on
-    // and they are still there
-    for (const [row, label, want] of [
-        [MODULE_ROWS.audit, "turns between continuity audits", "200"],
-        [MODULE_ROWS.bonds, "minimum turns between bond advances", "300"]
+    // Rows belonging to deleted modules are gone, not carried forward as decoration
+    for (const dead of [
+        "track progress clocks and scheduled consequences",
+        "enable player commands like /help and /undo",
+        "check that context injections are landing at all"
     ]) {
-        assertEqual(
-            readSettings(adventure)[label], undefined,
-            `"${label}" is being shown for a module that is switched off`
-        );
-        editSetting(adventure, row, "true");
-        adventure.hook("context", "Recent Story:\nnothing yet.");
-        assertEqual(
-            readSettings(adventure)[label], want,
-            `"${label}" was lost while its module was switched off`
-        );
+        assertEqual(after[dead], undefined, `a deleted module's row survived migration: ${dead}`);
     }
     assertEqual(adventure.throws.length, 0, "migrating the legacy card threw");
 });
@@ -2572,16 +2047,15 @@ test("Chronicle's own cards carry no trigger keys", () => {
     seedAgents(adventure);
     const session = new Session([adventure], { seed: 51 });
     session.play("> You begin with Leah.", "do");
-    for (const row of [MODULE_ROWS.world, MODULE_ROWS.clocks, MODULE_ROWS.diag, MODULE_ROWS.audit]) {
+    for (const row of [MODULE_ROWS.world, MODULE_ROWS.diag]) {
         editSetting(adventure, row, "true");
     }
     for (let i = 0; i < 6; i++) {
         session.play(`> You work with Leah, ${i}.`, "do");
     }
-    session.force("(audit = `No contradictions found.`) Iris walks on.");
     session.play("> You keep working with Leah.", "do");
     session.play("> You keep going with Leah.", "do");
-    const owned = ["Chronicle", "Chronicle Clocks", "Chronicle Diagnostics", "Chronicle Continuity Log"];
+    const owned = ["Chronicle", "Chronicle Diagnostics"];
     let seen = 0;
     for (const title of owned) {
         const card = adventure.storyCards.find(c => (c.title === title));
@@ -2594,7 +2068,7 @@ test("Chronicle's own cards carry no trigger keys", () => {
             `${title} still has trigger keys, so it competes with the story for context`
         );
     }
-    assert(2 < seen, `expected Chronicle's own cards to exist, found ${seen}`);
+    assertEqual(seen, 2, `expected both of Chronicle's own cards, found ${seen}`);
 });
 
 // ---------------------------------------------------------------- 25. output integrity
@@ -2752,31 +2226,34 @@ test("shouted dialogue is not mistaken for a leaked instruction", () => {
 
 suite("26. Bugs reported from a live adventure");
 
-test("/diag names every setting the profile overruled, and by how much", () => {
+test("the diagnostics card names every setting the profile overruled, and by how much", () => {
+    // The console is gone: a command could only end a turn by stopping it, which the player
+    // saw as an error. The card answers the same questions and costs no turn
     const { adventure, session } = moduleAdventure(
-        { ensemble: "true", brains: "3", audit: "true", auditEvery: "75", world: "true", consoleOn: "true" },
-        { maxChars: 25000 }
+        { world: "true", diag: "true" }, { maxChars: 25000 }
     );
+    editSetting(adventure, MODULE_ROWS.worldChars, "900");
     session.play("> You work with Leah.", "do");
-    adventure.hook("input", "/diag");
-    const report = String(adventure.sandbox.state.message);
-    assert(/Overruled by profile S:/.test(report), `no override line in /diag:\n${report}`);
-    assert(/brains 1 \(you set 3\)/.test(report), `the brain cap was not explained:\n${report}`);
-    assert(/audits every 150 \(you set 75\)/.test(report), `the audit floor was not explained:\n${report}`);
-    // And at a context where nothing is capped, it says so rather than staying silent
-    const roomy = moduleAdventure(
-        { ensemble: "true", brains: "3", consoleOn: "true" }, { maxChars: 150000 }
-    );
-    roomy.session.play("> You work with Leah.", "do");
-    roomy.adventure.hook("input", "/diag");
+    session.play("> You work with Leah again.", "do");
+    const card = cardTitled(adventure, "Chronicle Diagnostics");
+    assert(card, "no diagnostics card");
+    assert(/context: 25000 chars, profile S/.test(card.description), `no context line:\n${card.description}`);
     assert(
-        /Overruled by profile L: nothing/.test(String(roomy.adventure.sandbox.state.message)),
+        /overruled by that profile: world block 500 \(you set 900\)/.test(card.description),
+        `the world block cap was not explained:\n${card.description}`
+    );
+    // And where nothing is capped, it says so rather than staying silent
+    const roomy = moduleAdventure({ world: "true", diag: "true" }, { maxChars: 150000 });
+    roomy.session.play("> You work with Leah.", "do");
+    roomy.session.play("> You work with Leah again.", "do");
+    assert(
+        /overruled by that profile: nothing/.test(cardTitled(roomy.adventure, "Chronicle Diagnostics").description),
         "a profile that caps nothing should say so"
     );
 });
 
 test("the calendar understands travel, not only sleep", () => {
-    const { adventure, session } = moduleAdventure({ world: "true", consoleOn: "true" }, { maxChars: 150000 });
+    const { adventure, session } = moduleAdventure({ world: "true" }, { maxChars: 150000 });
     const day = () => adventure.state.CHRONICLE.world.day;
     const settle = () => session.play("> You look about with Leah.", "do");
     for (const [prose, expected] of [
@@ -2831,13 +2308,13 @@ test("time passes on turns where nobody was asked to think", () => {
 });
 
 test("the calendar carries a season and a year, not just a day", () => {
-    const { adventure, session } = moduleAdventure({ world: "true", consoleOn: "true" }, { maxChars: 150000 });
+    const { adventure, session } = moduleAdventure({ world: "true" }, { maxChars: 150000 });
     session.play("> You look around with Leah.", "do");
     const card = cardTitled(adventure, "Chronicle");
     assert(card, "no world card");
     assert(/Season length: 91/.test(card.description), `no season length on the card:\n${card.description}`);
     assert(/Seasons: Spring; Summer; Autumn; Winter/.test(card.description), "no seasons on the card");
-    // The injected block states it
+    // The injected block states it, which is the only place it matters
     const step = session.play("> You walk on with Leah.", "do");
     assert(
         /- Date: [^\n]*Spring, year 1/.test(step.contextOut[0]),
@@ -2847,32 +2324,32 @@ test("the calendar carries a season and a year, not just a day", () => {
     card.description = card.description
         .replace(/^Season length:.*$/m, "Season length: 30")
         .replace(/^Seasons:.*$/m, "Seasons: Thaw; High Sun; Harvest; Dark");
-    // One advance per turn: the first phrase that matches wins, by design
     session.force("You travel south for two weeks with Leah, and the road is long.");
     session.play("> You ride out.", "do");
     session.play("> You arrive.", "do");
-    adventure.hook("input", "/state");
-    const state = String(adventure.sandbox.state.message);
-    assert(/day 15/.test(state), `the day did not advance as expected:\n${state}`);
-    assert(/Thaw/.test(state), `the player's own season names were ignored:\n${state}`);
+    assertEqual(adventure.state.CHRONICLE.world.day, 15, "the calendar did not advance as expected");
+    const named = session.play("> You look about.", "do");
+    assert(
+        /Thaw/.test(named.contextOut[0]),
+        "the player's own season names were ignored"
+    );
     // Long enough to roll the year over
     adventure.state.CHRONICLE.world.day = 121;
-    adventure.hook("input", "/state");
+    const rolled = session.play("> A long while later.", "do");
     assert(
-        /year 2/.test(String(adventure.sandbox.state.message)),
-        `the year did not roll over: ${String(adventure.sandbox.state.message).split("\n")[0]}`
+        /year 2/.test(rolled.contextOut[0]),
+        `the year did not roll over:\n${(rolled.contextOut[0].match(/- Date: [^\n]*/) || ["(no date line)"])[0]}`
     );
 });
 
 test("an empty seasons row on the card does not delete the calendar", () => {
-    const { adventure, session } = moduleAdventure({ world: "true", consoleOn: "true" }, { maxChars: 150000 });
+    const { adventure, session } = moduleAdventure({ world: "true" }, { maxChars: 150000 });
     session.play("> You look around with Leah.", "do");
     const card = cardTitled(adventure, "Chronicle");
     card.description = card.description.replace(/^Seasons:.*$/m, "Seasons: ");
-    session.play("> You walk on with Leah.", "do");
-    adventure.hook("input", "/state");
+    const step = session.play("> You walk on with Leah.", "do");
     assert(
-        /Spring/.test(String(adventure.sandbox.state.message)),
+        /Spring/.test(step.contextOut[0]),
         "clearing the seasons row left the calendar with no seasons at all"
     );
 });

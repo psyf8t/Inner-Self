@@ -433,7 +433,7 @@ function enableModules(adventure) {
         return false;
     }
     card.entry = card.entry.split("\n").map(line => (
-        /^> (?:Tiered memory|Track world state|Let several|Track who witnessed|Track progress|Run periodic|Enable player commands|Track relationship|Enable diagnostics|Scale injections|Watch whether|Check that context|Use terse prompts)/.test(line)
+        /^> (?:Tiered memory|Track world state|Track who witnessed|Enable diagnostics)/.test(line)
             ? `${line.slice(0, line.indexOf(":"))}: true`
             : line
     )).join("\n");
@@ -448,7 +448,6 @@ function enableModules(adventure) {
     const bystander = JSON.stringify(adventure.storyCards.find(c => c.title === "Lighthouse"));
     // Hostile content in the cards the modules read
     const worldCard = adventure.storyCards.find(c => (c.title === "Chronicle"));
-    const clockCard = adventure.storyCards.find(c => (c.title === "Chronicle Clocks"));
     const hostileCards = [
         "Date: __proto__\nLocation: constructor\nStanding: __proto__ 99999999",
         `Date: ${"d".repeat(20000)}`,
@@ -458,21 +457,10 @@ function enableModules(adventure) {
         "Date\nLocation\nArc",
         '{"__proto__": {"polluted": true}}'
     ];
-    const hostileClocks = [
-        "__proto__: 3/8\n  trigger: anything\n  consequence: everything",
-        "clock: 999999999/0\n  trigger: \n  consequence: ",
-        "clock: -5/-5\n  trigger: a\n  consequence: b",
-        `${"clock: 1/2\n  trigger: t\n".repeat(500)}`,
-        "clock: 1/2\n  trigger: " + "t".repeat(10000),
-        "  trigger: orphaned trigger with no clock"
-    ];
     for (const [index, hostile] of hostileCards.entries()) {
         const label = `world[${index}]`;
         if (worldCard) {
             worldCard.description = hostile;
-        }
-        if (clockCard) {
-            clockCard.description = hostileClocks[index % hostileClocks.length];
         }
         try {
             const context = adventure.hook("context", buildContext(adventure));
@@ -486,35 +474,6 @@ function enableModules(adventure) {
             fail(label, `threw: ${error.message}`, hostile.slice(0, 80));
         }
         check(prototypeFingerprint(adventure) === baseline, label, "a prototype was modified", hostile.slice(0, 80));
-    }
-    // Hostile console commands
-    const hostileCommands = [
-        "/pin __proto__ __proto__",
-        "/pin Leah __proto__",
-        "/unpin constructor constructor",
-        `/forget Leah ${"k".repeat(10000)}`,
-        `/date ${"d".repeat(10000)}`,
-        "/undo undo undo",
-        "/diag; DROP TABLE",
-        "/who\n/who\n/who",
-        "/",
-        "//",
-        "/pin",
-        "/audit now please",
-        `/${"a".repeat(500)}`,
-        "/help ​‌‍"
-    ];
-    for (const [index, command] of hostileCommands.entries()) {
-        const label = `command[${index}]`;
-        try {
-            const out = adventure.hook("input", command);
-            check(out !== "", label, "input hook returned an empty string", command.slice(0, 60));
-            adventure.push(out, "do");
-            const context = adventure.hook("context", buildContext(adventure));
-            check(context !== "", label, "context hook returned an empty string", command.slice(0, 60));
-        } catch (error) {
-            fail(label, `threw: ${error.message}`, command.slice(0, 60));
-        }
     }
     // Module K reads info.maxChars every turn, and the platform is not obliged to be sane
     const hostileSizes = [0, -1, -999999, 0.5, NaN, Infinity, -Infinity, 1, 2 ** 53, undefined, null, "40000", 12000, 32000];
@@ -543,11 +502,6 @@ function enableModules(adventure) {
             label, `injection cost became ${JSON.stringify(cost.total)}`, String(size)
         );
     }
-    adventure.maxChars = 25000;
-    check(
-        ["unknown", "landing", "blocked"].includes(adventure.state.CHRONICLE.canary.state),
-        "modules", `canary state became ${JSON.stringify(adventure.state.CHRONICLE.canary.state)}`
-    );
     check(
         ["healthy", "degraded", "minimal"].includes(adventure.state.CHRONICLE.compliance.band),
         "modules", `compliance band became ${JSON.stringify(adventure.state.CHRONICLE.compliance.band)}`
@@ -583,18 +537,12 @@ function enableModules(adventure) {
     // Every module's own structures stayed inside their caps
     const ch = adventure.state.CHRONICLE;
     check(ch.journal.length <= 20, "modules", `journal grew to ${ch.journal.length}`);
-    check(ch.queue.length <= 12, "modules", `queue grew to ${ch.queue.length}`);
     check(ch.events.length <= 200, "modules", `event log grew to ${ch.events.length}`);
-    check(Object.keys(ch.facts).length <= 60, "modules", `fact table grew to ${Object.keys(ch.facts).length}`);
-    check(
-        Object.values(ch.bonds).every(bond => Number.isInteger(bond.stage) && (0 <= bond.stage) && (bond.stage <= 6)),
-        "modules", `a bond escaped its range: ${JSON.stringify(ch.bonds)}`
-    );
     check(
         String(ch.world.date).length <= 200,
         "modules", `the date grew to ${String(ch.world.date).length} chars`
     );
-    console.log(`  ${hostileCards.length} hostile module cards, ${hostileCommands.length} hostile commands`);
+    console.log(`  ${hostileCards.length} hostile module cards`);
 })();
 
 // ---------------------------------------------------------------- report

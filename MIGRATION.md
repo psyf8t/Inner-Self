@@ -114,15 +114,8 @@ profile's floor is raised to that floor. `/diag` names the profile in force.
 |:--|:--|:--|
 | **B** Tiered memory | Keys prefixed `#` are now pinned. Each character gets one pinned fact seeded from their own story card the next time they think | A brain over its character budget starts evicting its coldest working thought. Set the budget high if you would rather it never did |
 | **C** World chronicle | A "Chronicle" card appears, holding the date and the rest. Up to 700 characters are injected each turn | That much of your context. The date starts from the config card's starting date, not from your story so far — set it once by hand or with `/date` |
-| **D** Ensemble | Several present characters share the brain budget | Each present character gets a smaller share than a single character used to |
 | **E** Knowledge model | Characters are told what they missed, and what they still wrongly believe | An event log in state, capped by the setting. Characters will act on stale information on purpose |
-| **F** Clocks | A "Chronicle Clocks" card appears with one example clock. Nothing advances until you author a trigger phrase | Nothing until you author one |
-| **G** Auditor | Every 75 turns, one thought slot is spent checking continuity instead. A "Chronicle Continuity Log" card appears | One thought every 75 turns |
-| **H** Console | `/help` and eleven other commands start working | Any story action that begins with `/` and happens to match a command name is treated as a command. Unknown ones still fall through |
-| **I** Bonds | Each character gets a standing, stored on their own card under `#bond` | The model is told it may record advances, which spends part of the prompt |
 | **J** Diagnostics | A "Chronicle Diagnostics" card appears; the state budget and hook time rails start enforcing | Optional work is skipped when a hook runs long, which is the point |
-| **M** Injection canary | Every twelfth turn asks the model to begin with `(ok)` | One turn in twelve is spent proving the channel works. Once confirmed, it drops to one in ninety-six |
-| **N** Lean emission | Prompts and blocks drop to a terse register under XS/S or poor compliance | Less instruction for the model to follow, which is the intent; the grammar it must produce is unchanged |
 
 Switching a module back off stops all of it immediately. Its cards stay where they are, inert, and
 are safe to delete — they will be rebuilt if you switch the module on again. State it wrote stays
@@ -130,15 +123,40 @@ too, ignored, and Module J will trim it if the state budget ever comes under pre
 
 ---
 
+## What was removed, and what happens to it
+
+Six modules were cut: ensemble, clocks and consequences, the continuity auditor, the player console,
+bonds, and the injection canary. They shared one context budget, one operation queue and one thought
+slot per turn with everything else, and at a small context most of them could not fit.
+
+Upgrading is automatic and needs nothing from you:
+
+- Their config card rows stop being emitted, so they disappear from the card rather than lingering as
+  rows that read as decoration.
+- Their state is deleted once, on the first turn after the upgrade: clock progress, the consequence
+  queue, bond stages, audit findings, console state and canary state.
+- The "Chronicle Clocks" and "Chronicle Continuity Log" cards are removed, once.
+- Anything the canary wrote to `state.memory.frontMemory` is cleared.
+- Bond stages stored on a character's card under `#bond` are left alone. They read as an ordinary
+  pinned thought now, and you can delete them by hand or leave them as flavour.
+
+Nothing that survived changes. Brains, the ledger, the world card and the event log carry over exactly.
+
+The console went with them, so `/diag` and its siblings no longer exist: a command could only end a
+turn by stopping it, which surfaced to the player as an error. What `/diag` reported now lives on the
+"Chronicle Diagnostics" card, which needs no turn and costs no context.
+
+---
+
 ## If you play DeepSeek, Gemma or GLM
 
-Modules **K** and **L** already run for you, with no switch. Turn on **M and N** before anything else, whatever else you enable. Between the four of them:
+Modules **K**, **L** and **N** already run for you, with no switch. Between them:
 
 - Context on those models ranges from 4K to 128K depending on tier, the Optimized Context toggle, and credits. **K** scales every injection to what you actually have this turn, rather than to a number chosen when the mod was written.
 - On GLM the credit extension is charged per action, so the size changes turn to turn. K re-reads it every turn and never caches it. This is why it has no switch: a fixed budget cannot meet a moving context.
 - Dynamic DeepSeek rotates between DeepSeek 3.0, 3.1 and 3.2 on every action, and they follow instructions differently. **L** discovers each rotation's capability instead of assuming it, and stops asking a model that cannot answer. It has no switch either, because a silently degrading model is exactly the failure nobody notices.
-- Optimized Context on Gemma and GLM can make the context hook read-only, silently discarding every injection. **M** detects that and moves the world to the memory channel, then tells you what the toggle is costing you.
-- **N** keeps the prompt short enough that a 4K turn still has room for the story.
+- Optimized Context on Gemma and GLM can make the context hook read-only, silently discarding every injection. Chronicle no longer tries to detect this, because it could not tell a blocked channel from a model ignoring an instruction. Turn Optimized Context off; the diagnostics card reports the context size it was last handed, and you can judge.
+- **N** keeps the prompt short enough that a 4K turn still has room for the story, and now applies automatically at the two smallest context sizes rather than waiting to be switched on.
 
 **Atlas and Raven are unsupported.** They are permanently cache-efficient and do not support all scripting functions. Chronicle will detect it (with M on) and say so, but there is no configuration that makes them work.
 

@@ -109,14 +109,6 @@ globalThis.MainSettings = (class MainSettings {
     MAX_DAYS_ADVANCED_PER_TURN: 30
     // (1 to 365)
     ,
-    // Module D — may several characters present in a scene think at once?
-    IS_ENSEMBLE_ENABLED: false
-    // (true or false)
-    ,
-    // Module D — how many full brains may share one context?
-    MAX_CONCURRENT_BRAINS: 3
-    // (1 to 6)
-    ,
     // Module E — do characters track who witnessed what, and act on what they still believe?
     IS_KNOWLEDGE_MODEL_ENABLED: false
     // (true or false)
@@ -128,30 +120,6 @@ globalThis.MainSettings = (class MainSettings {
     // Module E — how likely is an unwitnessed household fact to reach someone each turn?
     RUMOR_SPREAD_PERCENT_PER_TURN: 10
     // (0 to 100)
-    ,
-    // Module F — are progress clocks and scheduled consequences tracked?
-    IS_CLOCKS_ENABLED: false
-    // (true or false)
-    ,
-    // Module G — does the continuity auditor periodically check the scene against the chronicle?
-    IS_CONTINUITY_AUDITOR_ENABLED: false
-    // (true or false)
-    ,
-    // Module G — how many turns pass between continuity audits?
-    AUDIT_INTERVAL: 75
-    // (10 to 1000)
-    ,
-    // Module H — are player commands (/help, /state, /undo, and the rest) available in game?
-    IS_PLAYER_CONSOLE_ENABLED: false
-    // (true or false)
-    ,
-    // Module I — do characters track a relationship bond with the player character?
-    IS_BONDS_ENABLED: false
-    // (true or false)
-    ,
-    // Module I — how many turns must pass between one bond advance and the next?
-    MIN_TURNS_PER_BOND_STAGE: 150
-    // (0 to 10000)
     ,
     // Module J — are diagnostics and safety rails active?
     IS_DIAGNOSTICS_ENABLED: false
@@ -173,14 +141,6 @@ globalThis.MainSettings = (class MainSettings {
     // Module L — how many turns does Chronicle stop asking after a model proves it cannot answer?
     COMPLIANCE_COOLDOWN_TURNS: 25
     // (5 to 200)
-    ,
-    // Module M — should Chronicle check whether its context injections are landing at all?
-    IS_INJECTION_CANARY_ENABLED: false
-    // (true or false)
-    ,
-    // Module N — should prompts drop to a terse register when context or compliance is tight?
-    IS_LEAN_EMISSION_ENABLED: false
-    // (true or false)
     ,
     }; //——————————————————————————————————————————————————————————————————————————————
 
@@ -435,14 +395,6 @@ function Chronicle(hook) {
     MAX_DAYS_ADVANCED_PER_TURN: 30
     // (1 to 365)
     ,
-    // Module D — may several characters present in a scene think at once?
-    IS_ENSEMBLE_ENABLED: false
-    // (true or false)
-    ,
-    // Module D — how many full brains may share one context?
-    MAX_CONCURRENT_BRAINS: 3
-    // (1 to 6)
-    ,
     // Module E — do characters track who witnessed what, and act on what they still believe?
     IS_KNOWLEDGE_MODEL_ENABLED: false
     // (true or false)
@@ -454,30 +406,6 @@ function Chronicle(hook) {
     // Module E — how likely is an unwitnessed household fact to reach someone each turn?
     RUMOR_SPREAD_PERCENT_PER_TURN: 10
     // (0 to 100)
-    ,
-    // Module F — are progress clocks and scheduled consequences tracked?
-    IS_CLOCKS_ENABLED: false
-    // (true or false)
-    ,
-    // Module G — does the continuity auditor periodically check the scene against the chronicle?
-    IS_CONTINUITY_AUDITOR_ENABLED: false
-    // (true or false)
-    ,
-    // Module G — how many turns pass between continuity audits?
-    AUDIT_INTERVAL: 75
-    // (10 to 1000)
-    ,
-    // Module H — are player commands (/help, /state, /undo, and the rest) available in game?
-    IS_PLAYER_CONSOLE_ENABLED: false
-    // (true or false)
-    ,
-    // Module I — do characters track a relationship bond with the player character?
-    IS_BONDS_ENABLED: false
-    // (true or false)
-    ,
-    // Module I — how many turns must pass between one bond advance and the next?
-    MIN_TURNS_PER_BOND_STAGE: 150
-    // (0 to 10000)
     ,
     // Module J — are diagnostics and safety rails active?
     IS_DIAGNOSTICS_ENABLED: false
@@ -497,14 +425,6 @@ function Chronicle(hook) {
     // Module L — how many turns does Chronicle stop asking after a model proves it cannot answer?
     COMPLIANCE_COOLDOWN_TURNS: 25
     // (5 to 200)
-    ,
-    // Module M — should Chronicle check whether its context injections are landing at all?
-    IS_INJECTION_CANARY_ENABLED: false
-    // (true or false)
-    ,
-    // Module N — should prompts drop to a terse register when context or compliance is tight?
-    IS_LEAN_EMISSION_ENABLED: false
-    // (true or false)
     ,
     }; //——————————————————————————————————————————————————————————————————————————————
 
@@ -637,24 +557,12 @@ function Chronicle(hook) {
             threats: [],
             lost: []
         },
-        // Module F: clock progress, keyed by clock name; definitions live on a card
-        clocks: {},
-        // Module F: scheduled consequences waiting for their turn
-        queue: [],
-        // Module F: consequences injected this turn, confirmed at commit
-        fire: null,
         // Module E: byte-capped log of what happened and who saw it
         events: [],
         // Module E: current facts, and who knows them
         facts: {},
         // Module E: what each character still believes, after the truth moved on
         stale: {},
-        // Module I: relationship stage per character
-        bonds: {},
-        // Module G: when the last audit ran, and what it found
-        audit: { last: 0, findings: [] },
-        // Module H: set by a slash command, read by the context hook
-        console: { stop: false },
         // Who is writing this turn, so a batch of retry candidates all reach the same brain
         writer: null,
         // Module J: hook timings, skips, the state size warning latch, and which settings
@@ -673,9 +581,32 @@ function Chronicle(hook) {
             window: [], band: "healthy", lowest: "healthy", streak: 0,
             cooldownUntil: 0, since: 0, told: false
         },
-        // Module M: whether context injections are landing at all
-        canary: { state: "unknown", misses: 0, hits: 0, lastTurn: -1, told: false, armed: 0 }
+        // Module J: the last context size seen, so the diagnostics card can report it
+        lastMaxChars: 0,
+        // Set once the cards of removed modules have been cleared away
+        purged: false
     });
+    // Modules D, F, G, H, I and M were removed. An adventure that ran them still has their
+    // state and their cards, so both are dropped once, here, rather than lingering as dead
+    // weight in every save and as decoration in every card list
+    for (const stale of ["clocks", "queue", "fire", "bonds", "audit", "console", "canary"]) {
+        if (Object.prototype.hasOwnProperty.call(CH, stale)) {
+            delete CH[stale];
+        }
+    }
+    if (CH.settings && (typeof CH.settings === "object")) {
+        // Remembered values for settings that no longer exist
+        for (const key of Object.keys(CH.settings)) {
+            if (/ensemble|brains|clock|consequence|audit|bond|canary|terseprompt|playercommand/.test(key)) {
+                delete CH.settings[key];
+            }
+        }
+    }
+    if (globalThis.state && state.memory && (typeof state.memory.frontMemory === "string")
+        && state.memory.frontMemory.startsWith("[Chronicle]")) {
+        // The removed canary wrote here, and nothing writes here now
+        state.memory.frontMemory = "";
+    }
     /**
      * Checks if Auto-Cards is available in the global scope
      * @returns {boolean} true if Auto-Cards is installed and callable
@@ -802,31 +733,16 @@ function Chronicle(hook) {
             worldChars: 700,
             startDate: "Day 1",
             maxDays: 30,
-            // Module D
-            ensemble: false,
-            brains: 3,
             // Module E
             knows: false,
             eventChars: 3000,
             rumor: 10,
-            // Module F
-            clocks: false,
-            // Module G
-            audit: false,
-            auditEvery: 75,
-            // Module H
-            console: false,
-            // Module I
-            bonds: false,
-            bondTurns: 150,
             // Module J
             diag: false,
             timeBudget: 1200,
             stateChars: 40000,
-            // Modules K to N (K and L have no switch, they always run)
-            cooldown: 25,
-            canary: false,
-            lean: false
+            // Modules K, L and N have no switch; only the cooldown is tunable
+            cooldown: 25
         });
         /** @type {config} */
         const config = { card: null };
@@ -1058,14 +974,6 @@ function Chronicle(hook) {
                     ) }
                 ] },
                 { rows: [
-                    { message: "Let several present characters think at once:", help: "Characters who act or speak are present; characters merely mentioned are not. Present characters share one context budget. Ask for this last, and only on a large context.", ...factory(
-                        "ensemble", S.IS_ENSEMBLE_ENABLED
-                    ) },
-                    { message: "Maximum full brains sharing one context:", help: "Upper bound on present characters given a full brain. Your live context size may lower it.", ...factory(
-                        "brains", S.MAX_CONCURRENT_BRAINS, { lower: 1, upper: 6 }
-                    ) }
-                ] },
-                { rows: [
                     { message: "Track who witnessed what, and what they still believe:", help: "Characters are told what they missed, and keep acting on facts that changed while they were away.", ...factory(
                         "knows", S.IS_KNOWLEDGE_MODEL_ENABLED
                     ) },
@@ -1077,32 +985,6 @@ function Chronicle(hook) {
                     ) }
                 ] },
                 { rows: [
-                    { message: "Track progress clocks and scheduled consequences:", help: "Author clocks on the \"Chronicle Clocks\" card. A clock advances only when the trigger phrase you declared appears in the prose, then queues its consequence.", ...factory(
-                        "clocks", S.IS_CLOCKS_ENABLED
-                    ) }
-                ] },
-                { rows: [
-                    { message: "Run periodic continuity audits:", help: "Spends one thought slot checking the scene against the world card, and reports contradictions without ever correcting them.", ...factory(
-                        "audit", S.IS_CONTINUITY_AUDITOR_ENABLED
-                    ) },
-                    { message: "Turns between continuity audits:", help: "How often that happens. Your context size sets a floor this cannot go below.", ...factory(
-                        "auditEvery", S.AUDIT_INTERVAL, { lower: 10, upper: 1000 }
-                    ) }
-                ] },
-                { rows: [
-                    { message: "Enable player commands like /help and /undo:", help: "Turns on the in-game console. Type /help for the list. Commands the platform owns are never registered.", ...factory(
-                        "console", S.IS_PLAYER_CONSOLE_ENABLED
-                    ) }
-                ] },
-                { rows: [
-                    { message: "Track relationship bonds with the player:", help: "Seven rungs, never skipped upward. The standing lives on each character's own card under #bond, and your hand edits win.", ...factory(
-                        "bonds", S.IS_BONDS_ENABLED
-                    ) },
-                    { message: "Minimum turns between bond advances:", help: "Cooldown between one rung and the next. A betrayal may still cost several rungs at once.", ...factory(
-                        "bondTurns", S.MIN_TURNS_PER_BOND_STAGE, { lower: 0, upper: 10000 }
-                    ) }
-                ] },
-                { rows: [
                     { message: "Enable diagnostics and safety rails:", help: "Watches saved state size and hook time, skips optional work rather than risk a timeout, and keeps a \"Chronicle Diagnostics\" card.", ...factory(
                         "diag", S.IS_DIAGNOSTICS_ENABLED
                     ) },
@@ -1111,16 +993,6 @@ function Chronicle(hook) {
                     ) },
                     { message: "Maximum characters of saved adventure state:", help: "Chronicle warns at 60% of this and trims at 85%, dropping the most expendable things first.", ...factory(
                         "stateChars", S.MAX_STATE_CHARS, { lower: 8000, upper: 200000 }
-                    ) }
-                ] },
-                { rows: [
-                    { message: "Check that context injections are landing at all:", help: "Asks the model to begin one reply in twelve with (ok). Three misses and Chronicle falls back to the memory channel and tells you, because that is what Optimized Context does.", ...factory(
-                        "canary", S.IS_INJECTION_CANARY_ENABLED
-                    ) }
-                ] },
-                { rows: [
-                    { message: "Use terse prompts when context or compliance is tight:", help: "One imperative line instead of fifteen, and bare thought lines, on a small context or a struggling model.", ...factory(
-                        "lean", S.IS_LEAN_EMISSION_ENABLED
                     ) }
                 ] },
                 { rows: [
@@ -2110,8 +1982,6 @@ function Chronicle(hook) {
                 ops: IS.ops,
                 // Cheap copies, taken before anything in this transaction is applied
                 world: cfg.world ? JSON.parse(JSON.stringify(CH.world)) : null,
-                clocks: cfg.clocks ? JSON.parse(JSON.stringify(CH.clocks)) : null,
-                bonds: cfg.bonds ? JSON.parse(JSON.stringify(CH.bonds)) : null
             };
             let entry = before.entry;
             if (entry.endsWith("UTC") && entry.startsWith("// initialized @")) {
@@ -2126,13 +1996,6 @@ function Chronicle(hook) {
                 // Module C: the card is authoritative, so a hand edit made since this
                 // transaction was staged wins over anything state remembers
                 readWorld("");
-            }
-            if (cfg.bonds && agent) {
-                // Module I: same rule, a standing edited by hand on the card wins
-                syncBondFromCard(pending.agent, brain);
-                // Let module operations reach this brain, for the mirror back
-                cfg.brain = brain;
-                cfg.brainAgent = pending.agent;
             }
             let ops = IS.ops;
             let applied = 0;
@@ -2198,11 +2061,9 @@ function Chronicle(hook) {
                     description: before.description,
                     label: before.label,
                     ops: before.ops,
-                    // A transaction is more than its thought: the day it moved, the clock
-                    // it turned and the standing it changed all belong to the same undo
-                    world: before.world,
-                    clocks: before.clocks,
-                    bonds: before.bonds
+                    // A transaction is more than its thought: the day it moved belongs to
+                    // the same undo
+                    world: before.world
                 }
                 // An oversized snapshot is not worth the state budget it would cost
                 : null
@@ -2480,6 +2341,24 @@ function Chronicle(hook) {
      * @param {string} description - Initial notes, used only when the card is built
      * @returns {Object|null} The card, or null if the platform refused to make one
      */
+    /**
+     * Removes a card left behind by a module that no longer exists
+     * @param {string} title
+     * @returns {void}
+     */
+    const dropCard = (title = "") => {
+        for (let i = storyCards.length - 1; -1 < i; i--) {
+            if (storyCards[i] && (storyCards[i].title === title)) {
+                if (typeof removeStoryCard === "function") {
+                    removeStoryCard(i);
+                } else {
+                    storyCards.splice(i, 1);
+                }
+                delete CH.index[title];
+            }
+        }
+        return;
+    };
     const ownCard = (title = "", entry = "", description = "") => {
         /**
          * Chronicle reads its own cards directly, so they need no trigger keys
@@ -2575,10 +2454,6 @@ function Chronicle(hook) {
         knows: (config.knows === true),
         eventChars: config.eventChars,
         rumor: config.rumor,
-        clocks: (config.clocks === true),
-        bonds: (config.bonds === true),
-        bondTurns: config.bondTurns,
-        audit: (config.audit === true),
         diag: (config.diag === true),
         stateChars: config.stateChars,
         timeBudget: config.timeBudget
@@ -2726,7 +2601,7 @@ function Chronicle(hook) {
         const mem = memoryOf(agentName);
         // The core tier is capped. Anything over the cap is demoted rather than deleted,
         // because a player who pinned six things meant all six of them
-        const pinned = Object.keys(brain).filter(isCore).filter(key => (key !== BOND_STORE));
+        const pinned = Object.keys(brain).filter(isCore);
         if (cfg.core < pinned.length) {
             const coldest = (a, b) => ((mem.seen[a] || 0) - (mem.seen[b] || 0));
             for (const key of pinned.sort(coldest).slice(0, pinned.length - cfg.core)) {
@@ -2776,7 +2651,7 @@ ${path(agentName)}.${bare} = ${path(agentName)}["${key}"];`);
      * @returns {string|null} Log line, or null if there was nothing to seed
      */
     const seedCore = (brain = {}, agentName = "", cfg = {}) => {
-        if (!cfg.tiers || Object.keys(brain).some(key => (isCore(key) && (key !== BOND_STORE)))) {
+        if (!cfg.tiers || Object.keys(brain).some(isCore)) {
             return null;
         }
         const source = storyCards.find(card => (
@@ -3110,62 +2985,6 @@ You must output one short parenthetical task followed by the story continuation.
         );
         return world.date;
     };
-    // ==================== MODULE D - ENSEMBLE ====================
-    /** Words that turn a name into a mention rather than an action */
-    const MENTION_WORDS = Object.freeze([
-        "about", "from", "of", "to", "for", "with", "like", "than", "toward", "towards",
-        "near", "against", "without", "unlike", "regarding", "concerning", "and", "or"
-    ]);
-    /**
-     * Who is actually present, as opposed to merely named
-     *
-     * A character who is spoken about is furniture. A character who acts or speaks is in
-     * the scene. The difference is worth getting right, because it decides who thinks
-     * @param {Object} config - Validated config
-     * @param {number} lookBack - How many recent actions count as "the scene"
-     * @returns {Object[]} [{ name, recency }] most recently active first
-     */
-    const presentAgents = (config = {}, lookBack = 2) => {
-        const found = new Map();
-        let scanned = 0;
-        for (let i = history.length - 1; (-1 < i) && (scanned < lookBack); i--) {
-            const actionText = history[i]?.text ?? history[i]?.rawText ?? "";
-            if ((typeof actionText !== "string") || /^[\s\u200B-\u200D]*$/.test(actionText)) {
-                continue;
-            }
-            scanned++;
-            const lower = actionText.toLowerCase();
-            for (const name of config.agents) {
-                if (found.has(name)) {
-                    continue;
-                }
-                const needle = name.toLowerCase();
-                for (let p = lower.indexOf(needle); (p !== -1); p = lower.indexOf(needle, p + 1)) {
-                    const before = (0 < p) ? lower.charCodeAt(p - 1) : 0;
-                    const after = ((p + needle.length) < lower.length) ? lower.charCodeAt(p + needle.length) : 0;
-                    if (((97 <= before) && (before <= 122)) || ((97 <= after) && (after <= 122))) {
-                        // Part of a longer word, not a name
-                        continue;
-                    }
-                    // A name preceded by "about" or "from" is being discussed, not acting
-                    const preceding = lower.slice(Math.max(0, p - 24), Math.max(0, p - 1)).trim().split(/[\s,]+/).pop();
-                    if (MENTION_WORDS.includes(preceding)) {
-                        continue;
-                    }
-                    // Acting or speaking: a verb-ish word follows, or dialogue is nearby
-                    const following = lower.slice(p + needle.length, p + needle.length + 24).trim();
-                    const sentence = lower.slice(Math.max(0, p - 120), p + 120);
-                    if (/^[a-z']+/.test(following) || /["«»„“”「」]/.test(sentence)) {
-                        found.set(name, scanned);
-                        break;
-                    }
-                }
-            }
-        }
-        return [...found.entries()]
-            .map(([name, recency]) => ({ name, recency }))
-            .sort((a, b) => (a.recency - b.recency));
-    };
     // ==================== MODULE E - KNOWLEDGE MODEL ====================
     /**
      * How far a fact travels on its own
@@ -3299,262 +3118,6 @@ You must output one short parenthetical task followed by the story continuation.
             return (total <= maxChars);
         });
     };
-    // ==================== MODULE F - CLOCKS AND CONSEQUENCES ====================
-    /**
-     * Reads the clock definitions the player authored
-     *
-     * Clocks advance on declared triggers and on nothing else. A clock that could advance
-     * because the scene felt tense would be a mood ring, not a clock
-     * @returns {Object} name -> { value, max, trigger, consequence, locked, reset }
-     */
-    const readClocks = () => {
-        const card = ownCard("Chronicle Clocks", [
-            "Progress clocks. Each clock fills only when its trigger phrase appears in the story.",
-            "Edit the notes below to author your own.",
-            "",
-            "Format:",
-            "clock_name: 0/8",
-            "  trigger: the phrase that advances it",
-            "  consequence: what happens when it fills",
-            "  reset: true"
-        ].join("\n"), [
-            "example_clock: 0/6",
-            "  trigger: the watch searches the barge",
-            "  consequence: the guild moves against the watch openly",
-            "  after: (optional) a phrase the story must reach first",
-            "  reset: false"
-        ].join("\n"));
-        const clocks = Object.create(null);
-        if (!card || (typeof card.description !== "string")) {
-            return clocks;
-        }
-        let current = null;
-        for (const line of card.description.split("\n").slice(0, 120)) {
-            const indented = /^\s+/.test(line);
-            const clean = line.trim();
-            if (clean === "") {
-                continue;
-            }
-            const bisector = clean.indexOf(":");
-            if (bisector < 1) {
-                continue;
-            }
-            const key = clean.slice(0, bisector).trim().toLowerCase();
-            const value = clean.slice(bisector + 1).trim();
-            if (!indented) {
-                const shape = value.match(/^(\d{1,3})\s*\/\s*(\d{1,3})$/);
-                if (!shape || !safeKey(key)) {
-                    current = null;
-                    continue;
-                }
-                const max = Math.max(1, Math.min(parseInt(shape[2], 10), 100));
-                current = {
-                    value: Math.max(0, Math.min(parseInt(shape[1], 10), max)),
-                    max,
-                    trigger: "",
-                    consequence: "",
-                    condition: "",
-                    locked: false,
-                    reset: false
-                };
-                clocks[key] = current;
-            } else if (current) {
-                if (key === "trigger") {
-                    current.trigger = value.slice(0, 120).toLowerCase();
-                } else if (key === "consequence") {
-                    current.consequence = value.slice(0, 200);
-                } else if ((key === "after") || (key === "condition")) {
-                    // The consequence waits for this phrase to appear before it surfaces
-                    current.condition = value.slice(0, 120).toLowerCase();
-                } else if (key === "reset") {
-                    current.reset = /^(?:true|yes|on|1)$/i.test(value);
-                } else if (key === "locked") {
-                    current.locked = /^(?:true|yes|on|1)$/i.test(value);
-                }
-            }
-        }
-        // State remembers progress; the card remembers definitions
-        for (const [name, clock] of Object.entries(clocks)) {
-            const stored = CH.clocks[name];
-            if (stored && Number.isInteger(stored.value)) {
-                clock.value = Math.max(0, Math.min(stored.value, clock.max));
-                clock.locked = (stored.locked === true);
-            }
-        }
-        return clocks;
-    };
-    /**
-     * Writes clock progress back to the card, so the player can watch the tension build
-     * @param {Object} clocks
-     * @returns {void}
-     */
-    const writeClocks = (clocks = {}) => {
-        const card = ownCard("Chronicle Clocks", "", "");
-        if (!card || (typeof card.description !== "string")) {
-            return;
-        }
-        card.description = card.description.split("\n").map(line => {
-            if (/^\s/.test(line)) {
-                return line;
-            }
-            const bisector = line.indexOf(":");
-            if (bisector < 1) {
-                return line;
-            }
-            const name = line.slice(0, bisector).trim().toLowerCase();
-            const clock = clocks[name];
-            return clock ? `${line.slice(0, bisector)}: ${clock.value}/${clock.max}` : line;
-        }).join("\n");
-        return;
-    };
-    /**
-     * Which clocks a turn's text declared a trigger for
-     * @param {Object} clocks
-     * @param {string} source - The turn's prose
-     * @returns {string[]} Clock names to advance
-     */
-    const triggeredClocks = (clocks = {}, source = "") => {
-        if (typeof source !== "string") {
-            return [];
-        }
-        const lower = source.toLowerCase();
-        return Object.entries(clocks)
-            .filter(([, clock]) => (
-                !clock.locked && (clock.trigger !== "") && lower.includes(clock.trigger)
-            ))
-            .map(([name]) => name);
-    };
-    /**
-     * The consequences due to surface now
-     * @returns {Object[]} Queue entries ready to fire
-     */
-    const dueConsequences = () => {
-        const turn = getActionCount();
-        // A condition is a phrase the story must have reached, which is what lets a letter
-        // written at turn 300 wait for the right hands rather than the right turn number
-        const recent = history.slice(-6).map(a => (a?.text ?? "")).join(" ").toLowerCase();
-        return CH.queue.filter(item => (
-            item && !item.fired
-            && Number.isInteger(item.fireAtTurn) && (item.fireAtTurn <= turn)
-            && ((typeof item.condition !== "string") || (item.condition === "") || recent.includes(item.condition))
-        )).slice(0, 2);
-    };
-    // ==================== MODULE I - BONDS ====================
-    /** The ladder, in order. Position is the whole point: it cannot be skipped upward */
-    const BOND_STAGES = Object.freeze([
-        "unknown",
-        "noticed",
-        "sought out",
-        "trusted with something costly",
-        "defended publicly",
-        "privately committed",
-        "formally bound"
-    ]);
-    /** The reserved key the model writes a bond advance into */
-    const BOND_KEY = "bond";
-    /** Where the bond is kept on the brain card, in the reserved namespace */
-    const BOND_STORE = `${CORE}bond`;
-    /**
-     * Reads a bond back off a brain card
-     * The card wins, exactly as it does for the world chronicle, so a player who edits a
-     * standing by hand is right and Chronicle is wrong
-     * @param {string} agentName
-     * @param {Object} brain
-     * @returns {void}
-     */
-    const syncBondFromCard = (agentName = "", brain = {}) => {
-        if (!own(brain, BOND_STORE)) {
-            return;
-        }
-        const written = String(brain[BOND_STORE]);
-        const index = BOND_STAGES.findIndex(stage => written.toLowerCase().includes(stage));
-        if (index !== -1) {
-            const bond = bondOf(agentName);
-            bond.stage = index;
-        }
-        return;
-    };
-    /**
-     * Writes the bond onto the brain card, where the player can see and edit it
-     * @param {string} agentName
-     * @param {Object} brain - Mutated in place
-     * @returns {void}
-     */
-    const syncBondToCard = (agentName = "", brain = {}) => {
-        brain[BOND_STORE] = `standing with the player: ${BOND_STAGES[bondOf(agentName).stage]}`;
-        return;
-    };
-    /**
-     * An agent's bond record, created on demand
-     * @param {string} agentName
-     * @returns {Object} { stage, turn }
-     */
-    const bondOf = (agentName = "") => {
-        if (!CH.bonds[agentName] || (typeof CH.bonds[agentName] !== "object")) {
-            CH.bonds[agentName] = { stage: 0, turn: -100000 };
-        }
-        const bond = CH.bonds[agentName];
-        bond.stage = Number.isInteger(bond.stage) ? Math.max(0, Math.min(bond.stage, 6)) : 0;
-        bond.turn = Number.isInteger(bond.turn) ? bond.turn : -100000;
-        return bond;
-    };
-    /**
-     * Turns whatever the model wrote into a bond step
-     * Accepts a stage name or a number, because models will write both
-     * @param {string} agentName
-     * @param {string} value - Raw value from the parenthetical
-     * @returns {number} The requested delta, before any clamping
-     */
-    const readBondRequest = (agentName = "", value = "") => {
-        const bond = bondOf(agentName);
-        const clean = String(value).toLowerCase().trim();
-        const digits = clean.match(/-?\d+/);
-        if (digits) {
-            const wanted = parseInt(digits[0], 10);
-            // A bare small number is a delta, a number on the ladder is a target
-            return ((-1 <= wanted) && (wanted <= 1)) ? wanted : (wanted - bond.stage);
-        }
-        if (/\b(?:down|back|break|broken|lost|colder|worse)\b/.test(clean)) {
-            return -1;
-        }
-        const index = BOND_STAGES.findIndex(stage => clean.includes(stage));
-        return (index === -1) ? 1 : (index - bond.stage);
-    };
-    // ==================== MODULE G - CONTINUITY AUDITOR ====================
-    /**
-     * Prompt for the audit task
-     * The auditor reports, it never repairs: a confident wrong correction does more damage
-     * to a long adventure than the inconsistency it was trying to fix
-     * @param {string} playerName
-     * @returns {string}
-     */
-    const auditPrompt = (playerName = "") => `
-<SYSTEM>
-# STRICT OUTPUT FORMAT
-You must output one short parenthetical task followed by the story continuation.
-
-## SHORT TASK (REQUIRED)
-- Start your output **immediately** with: (audit = \`One sentence.\`)
-- Compare the current scene against the world facts listed above
-- If a fact contradicts the scene, state the single clearest contradiction in one sentence
-- If everything is consistent, write exactly: (audit = \`No contradictions found.\`)
-- Do not fix anything, do not change the story to match, only report
-- Never invent a contradiction to have something to say
-
-## STORY CONTINUATION (REQUIRED)
-- After the closing parenthesis, write **one space** and then continue the story
-- Continue from ${playerName}'s perspective, exactly as if nothing had been asked
-</SYSTEM>
-    `.trim();
-    /**
-     * Is an audit due?
-     * @param {Object} config
-     * @returns {boolean}
-     */
-    const auditDue = (config = {}) => (
-        (config.audit === true)
-        && (config.auditEvery <= (getActionCount() - (CH.audit.last || 0)))
-    );
     // ==================== MODULE OPERATIONS ====================
     /**
      * Applies one non-brain operation descriptor
@@ -3595,86 +3158,6 @@ You must output one short parenthetical task followed by the story continuation.
                 return `world.lost.push(${JSON.stringify(op.value.slice(0, 120))});`;
             }
             return null;
-        }
-        if (op.mod === "clock") {
-            if ((op.op !== "tick") || !safeKey(op.id)) {
-                return null;
-            }
-            const clocks = readClocks();
-            const clock = clocks[op.id];
-            if (!clock || clock.locked) {
-                return null;
-            }
-            const step = Number.isInteger(op.n) ? Math.max(1, Math.min(op.n, clock.max)) : 1;
-            clock.value = Math.min(clock.value + step, clock.max);
-            const lines = [`clocks.${op.id} = "${clock.value}/${clock.max}";`];
-            if (clock.value >= clock.max) {
-                // A full clock is a promise the story already made
-                CH.queue = [...CH.queue, {
-                    id: `${op.id}-${getActionCount()}`,
-                    fireAtTurn: getActionCount() + 1,
-                    condition: clock.condition || "",
-                    payload: clock.consequence || `${op.id} comes due`,
-                    fired: false
-                }].slice(-12);
-                lines.push(`queue.push(${JSON.stringify(clock.consequence || op.id)});`);
-                if (clock.reset) {
-                    clock.value = 0;
-                    lines.push(`clocks.${op.id} = "0/${clock.max}";`);
-                } else {
-                    clock.locked = true;
-                    lines.push(`clocks.${op.id}.locked = true;`);
-                }
-            }
-            CH.clocks[op.id] = { value: clock.value, locked: clock.locked };
-            writeClocks(clocks);
-            return lines.join("\n");
-        }
-        if (op.mod === "queue") {
-            if (op.op !== "fire") {
-                return null;
-            }
-            const ids = Array.isArray(op.ids) ? op.ids.slice(0, 4) : [];
-            const fired = [];
-            CH.queue = CH.queue.filter(item => {
-                if (item && ids.includes(item.id)) {
-                    fired.push(item.payload);
-                    return false;
-                }
-                return true;
-            });
-            return (fired.length === 0) ? null : `queue.fired(${JSON.stringify(fired)});`;
-        }
-        if (op.mod === "bond") {
-            if ((op.op !== "step") || (typeof op.npc !== "string") || (op.npc === "")) {
-                return null;
-            }
-            const bond = bondOf(op.npc);
-            const turn = getActionCount();
-            const wanted = Number.isInteger(op.delta) ? op.delta : 0;
-            if (wanted === 0) {
-                return null;
-            }
-            if (0 < wanted) {
-                // Upward is one rung at a time, and never before the cooldown has passed
-                if ((turn - bond.turn) < cfg.bondTurns) {
-                    CH.stats.refused++;
-                    return null;
-                }
-                if (bond.stage >= (BOND_STAGES.length - 1)) {
-                    return null;
-                }
-                bond.stage++;
-            } else {
-                // Downward may skip, because trust breaks faster than it forms
-                bond.stage = Math.max(0, bond.stage + wanted);
-            }
-            bond.turn = turn;
-            if (cfg.brain && (op.npc === cfg.brainAgent)) {
-                // Mirror it into the reserved namespace on that character card
-                syncBondToCard(op.npc, cfg.brain);
-            }
-            return `bonds.${formatKey(op.npc) || "npc"} = ${JSON.stringify(BOND_STAGES[bond.stage])};`;
         }
         if (op.mod === "event") {
             if (op.op !== "record") {
@@ -3722,25 +3205,6 @@ You must output one short parenthetical task followed by the story continuation.
             }
             return null;
         }
-        if (op.mod === "audit") {
-            if ((op.op !== "record") || (typeof op.value !== "string")) {
-                return null;
-            }
-            CH.audit.last = getActionCount();
-            const clean = op.value.trim().slice(0, 300);
-            const clear = /^no contradictions?/i.test(clean);
-            CH.audit.findings = [...(clear ? [] : [{ t: getActionCount(), text: clean }]), ...CH.audit.findings].slice(0, 10);
-            const card = ownCard("Chronicle Continuity Log", "Contradictions Chronicle noticed. Nothing here is corrected automatically, because a confident wrong correction is worse than a flagged inconsistency.", "");
-            if (card) {
-                card.description = CH.audit.findings.length
-                    ? CH.audit.findings.map(finding => `Turn ${finding.t}: ${finding.text}`).join("\n\n")
-                    : "No contradictions found so far.";
-            }
-            if (!clear) {
-                state.message = `Chronicle noticed a possible contradiction: ${clean}`;
-            }
-            return `audit.report(${JSON.stringify(clean.slice(0, 80))});`;
-        }
         return null;
     };
     // ==================== MODULE K - RUNTIME BUDGET AUTOSCALING ====================
@@ -3758,11 +3222,11 @@ You must output one short parenthetical task followed by the story continuation.
      */
     const BUDGET_TABLE = Object.freeze([
         // name, ceiling on maxChars, then the budgets that apply below that ceiling
-        { name: "XS", upTo: 12000, chronicle: 350, brains: 1, digests: 0, witness: 0, clockLines: 1, audit: 0, injectPercent: 12 },
-        { name: "S", upTo: 32000, chronicle: 500, brains: 1, digests: 2, witness: 0, clockLines: 1, audit: 150, injectPercent: 20 },
-        { name: "M", upTo: 80000, chronicle: 700, brains: 2, digests: 3, witness: 1, clockLines: 2, audit: 100, injectPercent: 30 },
-        { name: "L", upTo: 200000, chronicle: 700, brains: 3, digests: 4, witness: 2, clockLines: 99, audit: 75, injectPercent: 35 },
-        { name: "XL", upTo: Infinity, chronicle: 900, brains: 4, digests: 99, witness: 99, clockLines: 99, audit: 75, injectPercent: 40 }
+        { name: "XS", upTo: 12000, chronicle: 350, witness: 0, injectPercent: 12 },
+        { name: "S", upTo: 32000, chronicle: 500, witness: 0, injectPercent: 20 },
+        { name: "M", upTo: 80000, chronicle: 700, witness: 1, injectPercent: 30 },
+        { name: "L", upTo: 200000, chronicle: 700, witness: 2, injectPercent: 35 },
+        { name: "XL", upTo: Infinity, chronicle: 900, witness: 99, injectPercent: 40 }
     ]);
     /**
      * The order in which features are given up when the context shrinks
@@ -3770,9 +3234,7 @@ You must output one short parenthetical task followed by the story continuation.
      * last things to shrink, and they never disappear entirely
      * @type {string[]}
      */
-    const DEGRADE_ORDER = Object.freeze([
-        "audit", "witness", "digests", "brains", "bondNote", "clockLines", "chronicle"
-    ]);
+    const DEGRADE_ORDER = Object.freeze(["witness", "chronicle"]);
     /** Two consecutive turns at a new size before switching, so a wobble does not thrash */
     const PROFILE_HYSTERESIS = 2;
     /**
@@ -3941,112 +3403,6 @@ You must output one short parenthetical task followed by the story continuation.
         // In the minimal band the world and existing brains still go in, read only
         return (CH.compliance.cooldownUntil <= getActionCount());
     };
-    // ==================== MODULE M - INJECTION CANARY ====================
-    /**
-     * Whether context injections are reaching the model at all
-     *
-     * With Optimized Context enabled, the context hook may be read-only: everything
-     * Chronicle writes is silently discarded, and every symptom looks exactly like a model
-     * that will not follow instructions. The two are told apart by asking for something so
-     * trivial that any model would comply if it saw it: begin the reply with (ok).
-     *
-     * A context modifier cannot observe its own return value, so this is the only honest
-     * test available. Three misses in a row and Chronicle stops trusting the channel
-     */
-    const CANARY_INTERVAL = 12;
-    const CANARY_MISSES_TO_FAIL = 3;
-    const CANARY_MARK = "(ok)";
-    /**
-     * Should this turn carry a canary?
-     * @param {Object} config - Validated config
-     * @returns {boolean}
-     */
-    const canaryDue = (config = {}) => {
-        if (config.canary !== true) {
-            return false;
-        }
-        const canary = CH.canary;
-        if (canary.state === "landing") {
-            // Proven once. Re-check occasionally, in case the player flips the toggle
-            return ((getActionCount() - (canary.lastTurn || 0)) >= (CANARY_INTERVAL * 8));
-        }
-        return ((getActionCount() - (canary.lastTurn || 0)) >= CANARY_INTERVAL);
-    };
-    /** The canary instruction, kept as short as anything in this file */
-    const canaryPrompt = () => `<SYSTEM>\n# Begin your reply with exactly ${CANARY_MARK} and then continue the story normally.\n</SYSTEM>`;
-    /**
-     * Records the result of a canary turn
-     * @param {boolean} seen - Did the reply carry the mark?
-     * @returns {void}
-     */
-    const recordCanary = (seen = false) => {
-        const canary = CH.canary;
-        canary.lastTurn = getActionCount();
-        if (seen) {
-            canary.hits = (canary.hits || 0) + 1;
-            canary.misses = 0;
-            if (canary.state !== "landing") {
-                canary.state = "landing";
-                log("Chronicle: context injections confirmed landing");
-                journal("canary", { why: "landing" });
-            }
-            return;
-        }
-        canary.misses = (canary.misses || 0) + 1;
-        if ((canary.misses >= CANARY_MISSES_TO_FAIL) && (canary.state !== "blocked")) {
-            canary.state = "blocked";
-            log("Chronicle: context injections are not reaching the model, falling back to memory");
-            journal("canary", { why: "blocked" });
-            if (canary.told !== true) {
-                canary.told = true;
-                state.message = "Chronicle's context injections are not reaching this model. This is what the Optimized Context setting does. Chronicle has fallen back to the memory channel, which carries the world but not the full simulation. Turning Optimized Context off restores it.";
-            }
-        }
-        return;
-    };
-    /**
-     * The fallback channel, used when the context hook's work is being discarded
-     *
-     * frontMemory sits directly in front of the model's continuation and authorsNote rides
-     * along with it, so between them the world survives even when the context hook does not.
-     * Written from onInput, which takes effect on the turn being generated
-     * @param {Object} config - Validated config
-     * @returns {void}
-     */
-    const writeFallbackChannel = (config = {}) => {
-        if (!globalThis.state) {
-            return;
-        }
-        state.memory = (state.memory && (typeof state.memory === "object")) ? state.memory : {};
-        if (CH.canary.state !== "blocked") {
-            // Only clear what this module wrote, never the player's own memory
-            if (typeof state.memory.frontMemory === "string" && state.memory.frontMemory.startsWith("[Chronicle]")) {
-                state.memory.frontMemory = "";
-            }
-            if (typeof state.memory.authorsNote === "string" && state.memory.authorsNote.startsWith("[Chronicle]")) {
-                state.memory.authorsNote = "";
-            }
-            return;
-        }
-        // Everything that has to survive the narrower channel, in priority order
-        const budget = Math.max(200, Math.min(600, Math.floor((CH.budget.maxChars || 8000) * 0.04)));
-        const lines = [];
-        if (config.world === true) {
-            const world = CH.world;
-            lines.push([
-                `Date ${world.date}`,
-                world.place ? `at ${world.place}` : "",
-                world.arc ? `arc: ${world.arc}` : "",
-                (world.threats.length ? `threats: ${world.threats.slice(0, 2).join(", ")}` : "")
-            ].filter(part => (part !== "")).join("; "));
-        }
-        if ((config.bonds === true) && (IS.agent !== "") && (IS.agent !== " ")) {
-            lines.push(`${IS.agent} stands at "${BOND_STAGES[bondOf(IS.agent).stage]}" with ${config.player}`);
-        }
-        const rendered = `[Chronicle] ${lines.filter(line => (line !== "")).join(" | ")}`.slice(0, budget);
-        state.memory.frontMemory = (lines.length === 0) ? "" : rendered;
-        return;
-    };
     // ==================== MODULE N - LEAN EMISSION ====================
     /**
      * Terse prompts, for when the context is small or the model is struggling
@@ -4101,12 +3457,8 @@ You must output one short parenthetical task followed by the story continuation.
             profile: "",
             band: "healthy",
             lean: false,
-            digests: 99,
             witness: 99,
-            clockLines: 99,
-            bondNote: true,
-            injectCap: Infinity,
-            landing: (config.canary === true) ? CH.canary.state : "landing"
+            injectCap: Infinity
         };
         {
             const maxChars = Number.isInteger(info.maxChars) ? info.maxChars : 0;
@@ -4131,36 +3483,23 @@ You must output one short parenthetical task followed by the story continuation.
             CH.diag.caps = {};
             // A profile only ever takes away. The player's own settings stay the ceiling
             runtime.worldChars = Math.min(config.worldChars, profile.chronicle);
-            runtime.brains = Math.min(config.brains, profile.brains);
             capped("world block", config.worldChars, runtime.worldChars);
-            capped("brains", config.brains, runtime.brains);
-            runtime.digests = profile.digests;
             runtime.witness = profile.witness;
-            runtime.clockLines = profile.clockLines;
-            runtime.auditEvery = (profile.audit === 0) ? 0 : Math.max(config.auditEvery, profile.audit);
-            runtime.audit = (config.audit === true) && (profile.audit !== 0);
-            if (config.audit === true) {
-                capped("audits every", config.auditEvery, (profile.audit === 0) ? "off" : runtime.auditEvery);
-            }
-            if ((config.ensemble === true) && (profile.digests === 0)) {
-                capped("ensemble digests", "on", "off");
-            }
             if ((config.knows === true) && (profile.witness === 0)) {
-                capped("witness lines", "on", "off");
+                capped("blind spot lines", "on", "off");
             }
             runtime.injectCap = Math.floor((maxChars || 0) * (profile.injectPercent / 100)) || Infinity;
-            runtime.lean = (config.lean === true) && ["XS", "S"].includes(profile.name);
+            // Module N has no switch: a small context gets the terse register, always
+            runtime.lean = ["XS", "S"].includes(profile.name);
+            CH.lastMaxChars = maxChars;
         }
         {
             runtime.band = settleBand(config);
             if (runtime.band !== "healthy") {
                 // Degraded and minimal both stop the extras competing for the model's
                 // attention, in the order laid down by DEGRADE_ORDER
-                runtime.lean = (config.lean === true) || runtime.lean;
-                runtime.audit = false;
+                runtime.lean = true;
                 runtime.witness = 0;
-                runtime.digests = Math.min(runtime.digests, 1);
-                runtime.brains = 1;
             }
         }
         return runtime;
@@ -4174,18 +3513,8 @@ You must output one short parenthetical task followed by the story continuation.
      */
     const degradeStep = (runtime = {}, index = 0) => {
         const feature = DEGRADE_ORDER[index];
-        if (feature === "audit") {
-            runtime.audit = false;
-        } else if (feature === "witness") {
+        if (feature === "witness") {
             runtime.witness = 0;
-        } else if (feature === "digests") {
-            runtime.digests = 0;
-        } else if (feature === "brains") {
-            runtime.brains = 1;
-        } else if (feature === "bondNote") {
-            runtime.bondNote = false;
-        } else if (feature === "clockLines") {
-            runtime.clockLines = 1;
         } else if (feature === "chronicle") {
             // The floor, never zero: a world nobody can see is not a world
             runtime.worldChars = Math.max(180, Math.min(runtime.worldChars, Math.floor(runtime.injectCap * 0.5)));
@@ -4203,377 +3532,27 @@ You must output one short parenthetical task followed by the story continuation.
      * @param {Object[]} present - Present agents, most recent first
      * @returns {string}
      */
-    const buildOverlay = (config = {}, present = [], primary = "") => {
+    const buildOverlay = (config = {}, primary = "") => {
         const parts = [];
-        if ((config.bonds === true) && (config.bondNote !== false) && (primary !== "")) {
-            // Module I tells the model how to record a change in standing, in the grammar
-            // the thought parser already reads. There is no second parser
-            const bond = bondOf(primary);
-            const waited = (getActionCount() - bond.turn);
-            if (config.lean === true) {
-                // One line, because a small context turn spent on ceremony is a turn the
-                // story does not get
-                parts.push(`<SYSTEM>\n# ${primary} stands at "${BOND_STAGES[bond.stage]}" with ${config.player}.${(
-                    (waited < config.bondTurns) ? "" : ` Write (bond = \`${BOND_STAGES[Math.min(bond.stage + 1, BOND_STAGES.length - 1)]}\`) only if this scene earned it.`
-                )}\n</SYSTEM>\n\n`);
-            } else {
-            parts.push(`<SYSTEM>\n# ${primary} currently stands at "${BOND_STAGES[bond.stage]}" with ${config.player}.\n# ${(
-                (waited < config.bondTurns)
-                ? `That standing is settled for now and must not change.`
-                : `If, and only if, this scene has genuinely earned it, ${primary} may record the next rung by writing (bond = \`${BOND_STAGES[Math.min(bond.stage + 1, BOND_STAGES.length - 1)]}\`) in place of a thought.`
-            )}\n# The ladder never skips upward: ${BOND_STAGES.join(", ")}.\n# A betrayal may drop ${primary} several rungs at once, written the same way.\n</SYSTEM>\n\n`);
-            }
-        }
         if (config.world === true) {
-            const extra = [];
-            if (config.clocks === true) {
-                for (const [name, clock] of Object.entries(readClocks())) {
-                    if (0 < clock.value) {
-                        extra.push(`Clock ${name.replace(/_/g, " ")}: ${clock.value}/${clock.max}${clock.locked ? " (spent)" : ""}`);
-                    }
-                }
-            }
-            parts.push(renderWorld(config.worldChars, extra.slice(0, config.clockLines ?? 99), config.lean === true));
+            parts.push(renderWorld(config.worldChars, [], config.lean === true));
         }
-        if (config.clocks === true) {
-            const due = dueConsequences();
-            if (0 < due.length) {
-                // A consequence that fired is an instruction, not a hint
-                parts.push(`<SYSTEM>\n# Bring this to the surface now, in this scene:\n${(
-                    due.map(item => `- ${item.payload}`).join("\n")
-                )}\n</SYSTEM>\n\n`);
-                CH.fire = { turn: getActionCount(), ids: due.map(item => item.id) };
-            }
-        }
-        if ((config.knows === true) && (0 < present.length)) {
-            const lines = [];
-            for (const { name } of present.slice(0, config.brains)) {
-                lines.push(...blindSpots(name, 240));
-            }
-            lines.splice(Number.isInteger(config.witness) ? config.witness : lines.length);
+        if ((config.knows === true) && (primary !== "")) {
+            const lines = blindSpots(primary, 240)
+                .slice(0, Number.isInteger(config.witness) ? config.witness : 99);
             if (0 < lines.length) {
-                parts.push(`# What the people here do not know: [\n${lines.map(line => `- ${line}`).join("\n")}\n]\n\n`);
-            }
-        }
-        if ((config.ensemble === true) && (config.brains < present.length) && (config.digests !== 0)) {
-            // Everyone present but crowded out of a full brain still gets a line, so they
-            // are people in the scene rather than furniture
-            const digests = [];
-            const room = Number.isInteger(config.digests) ? config.digests : 4;
-            for (const { name } of present.slice(config.brains, config.brains + Math.min(room, 4))) {
-                const other = new Agent(name, { percent: config.percent });
-                const brain = other.brain;
-                let best = null;
-                let bestLabel = -1;
-                for (const key of Object.keys(brain)) {
-                    const value = String(brain[key]);
-                    const arrow = value.indexOf("→");
-                    const label = (arrow === -1) ? 0 : (parseInt(value.slice(0, arrow), 10) || 0);
-                    if (bestLabel < label) {
-                        bestLabel = label;
-                        best = value.slice(arrow + 1).trim();
-                    }
-                }
-                other.lobotomize();
-                if (best) {
-                    digests.push(`- ${name}: ${best}`);
-                }
-            }
-            if (0 < digests.length) {
-                parts.push(`# Also here, and thinking their own thoughts: [\n${digests.join("\n")}\n]\n\n`);
+                parts.push(`# What ${primary} does not know: [\n${lines.map(line => `- ${line}`).join("\n")}\n]\n\n`);
             }
         }
         return parts.join("");
     };
     /**
-     * Full brains for the other characters in the scene
-     *
-     * The context budget is split between everyone present rather than handed to one of
-     * them, so a three character scene reads as three people instead of one person and two
-     * pieces of furniture
-     * @param {Object} config - Validated config
-     * @param {Object[]} present - Present agents, most recent first
-     * @param {string} primary - The agent who will actually write this turn
-     * @param {Set} whitelist - Labels allowed to decode, extended in place
-     * @returns {string}
-     */
-    const ensembleBlocks = (config = {}, present = [], primary = "", whitelist = new Set(), storyChars = 4000) => {
-        if (config.ensemble !== true) {
-            return "";
-        }
-        const others = present.filter(entry => (entry.name !== primary)).slice(0, Math.max(0, config.brains - 1));
-        const blocks = [];
-        for (const { name } of others) {
-            const other = new Agent(name, { percent: config.percent });
-            const brain = other.brain;
-            const thoughts = [];
-            for (const key of Object.keys(brain)) {
-                const value = String(brain[key]);
-                const arrow = value.indexOf("→");
-                const label = (arrow === -1) ? null : parseInt(value.slice(0, arrow), 10);
-                if (Number.isInteger(label)) {
-                    whitelist.add(label);
-                }
-                thoughts.push((config.lean === true)
-                    ? `${Number.isInteger(label) ? `[${label}] ` : ""}${bareKey(key)}: ${value.slice(arrow + 1).trim()}`
-                    : `${Number.isInteger(label) ? `[${label}] ` : ""}(${bareKey(key)}: \`${value.slice(arrow + 1).trim()}\`)`);
-            }
-            other.lobotomize();
-            if (thoughts.length === 0) {
-                // Present, but has never had a thought yet. Saying so keeps them a person
-                // in the scene rather than scenery the narrator may quietly forget
-                blocks.push(`# ${name}${name.toLowerCase().endsWith("s") ? "'" : "'s"} brain and inner self: [\n- ${name} is here, and has not formed any thoughts yet.\n]`);
-                continue;
-            }
-            // The budget is the same one a single brain would have had, divided between
-            // everybody present rather than handed to whoever spoke last
-            const share = Math.max(200, Math.floor(
-                ((config.percent / 100) * storyChars) / Math.max(1, config.brains)
-            ));
-            let block = "";
-            for (const thought of thoughts) {
-                if ((block.length + thought.length + 1) > share) {
-                    break;
-                }
-                block += `${thought}\n`;
-            }
-            if (block !== "") {
-                blocks.push((config.lean === true)
-                    ? `${name} mind:\n${block.trimEnd()}`
-                    : `# ${name}${name.toLowerCase().endsWith("s") ? "'" : "'s"} brain and inner self: [\n${block.trimEnd()}\n]`);
-            }
-        }
-        return (blocks.length === 0) ? "" : `${blocks.join("\n\n")}\n\n`;
-    };
-    // ==================== MODULE H - PLAYER CONSOLE ====================
-    /**
-     * Commands the platform itself handles
-     *
-     * Chronicle refuses to register any of these, so they pass through untouched. This list
-     * is not verifiable from inside a script, so it is deliberately wide and deliberately
-     * editable: add anything the platform claims later, and Chronicle will stand aside
-     * @type {string[]}
-     */
-    const NATIVE_COMMANDS = Object.freeze([
-        "reset", "retry", "revert", "erase", "redo", "undoall", "alter", "remember",
-        "note", "continue", "do", "say", "story", "see", "image", "settings", "quit",
-        "exit", "save", "load", "ac"
-    ]);
-    /**
-     * Handles a slash command typed by the player
-     *
-     * Console changes are applied immediately rather than staged. There is no generation to
-     * discard: the player typed this, and a retry regenerates model output, never input
-     * @param {string} command - Raw input text
-     * @param {Object} config - Validated config
-     * @returns {string|null} The reply to show, or null if this was not a command
-     */
-    const runCommand = (command = "", config = {}) => {
-        const match = String(command).trim().match(/^\/([a-z]+)\s*([\s\S]{0,200})$/i);
-        if (!match) {
-            return null;
-        }
-        const name = match[1].toLowerCase();
-        if (NATIVE_COMMANDS.includes(name)) {
-            // The platform owns this one. A player who breaks their own retry because
-            // Chronicle ate /reset will not be charmed by the explanation
-            return null;
-        }
-        const args = match[2].trim().split(/\s+/).filter(part => (part !== ""));
-        const agentNamed = (raw = "") => config.agents.find(
-            agent => (agent.toLowerCase() === String(raw).toLowerCase())
-        );
-        if (name === "help") {
-            return [
-                "Chronicle commands:",
-                "/state - the world as Chronicle sees it",
-                "/clocks - progress clocks and what is queued",
-                "/bonds - where each character stands with you",
-                "/who - who is present and how the context is split",
-                "/pin <name> <key> - protect a thought from ever being forgotten",
-                "/unpin <name> <key> - let it be forgotten again",
-                "/forget <name> <key> - delete a thought now",
-                "/undo - revert the last committed change",
-                "/date <value> - set the in-game date",
-                "/audit - run a continuity check on the next turn",
-                "/diag - state size, timings, and recent transactions"
-            ].join("\n");
-        }
-        if (name === "state") {
-            const world = CH.world;
-            return [
-                `Date: ${world.date}, ${seasonOf(world.day).season}, year ${seasonOf(world.day).year} (day ${world.day})`,
-                `Location: ${world.place || "unrecorded"}`,
-                `Arc: ${world.arc || "unrecorded"}`,
-                `Standing: ${Object.entries(world.factions).map(([k, v]) => `${k} ${(0 <= v) ? "+" : ""}${v}`).join(", ") || "none"}`,
-                `Open debts: ${world.debts.join("; ") || "none"}`,
-                `Open threats: ${world.threats.join("; ") || "none"}`,
-                `Lost to memory: ${world.lost.join("; ") || "nothing yet"}`,
-                `Thinking characters: ${config.agents.join(", ") || "none configured"}`
-            ].join("\n");
-        }
-        if (name === "clocks") {
-            const clocks = Object.entries(readClocks());
-            const queued = CH.queue.filter(item => !item.fired);
-            return [
-                clocks.length
-                    ? clocks.map(([id, clock]) => `${id}: ${clock.value}/${clock.max}${clock.locked ? " (spent)" : ""}`).join("\n")
-                    : "No clocks defined. Edit the \"Chronicle Clocks\" card to author some.",
-                queued.length ? `\nComing: ${queued.map(item => item.payload).join("; ")}` : ""
-            ].join("\n").trim();
-        }
-        if (name === "bonds") {
-            const lines = config.agents.map(agent => {
-                const bond = bondOf(agent);
-                const waited = getActionCount() - bond.turn;
-                return `${agent}: ${BOND_STAGES[bond.stage]}${(waited < config.bondTurns) ? ` (${config.bondTurns - waited} turns until they can move closer)` : ""}`;
-            });
-            return lines.length ? lines.join("\n") : "No characters configured.";
-        }
-        if (name === "who") {
-            const present = presentAgents(config);
-            if (present.length === 0) {
-                return "Nobody is acting in the scene right now.";
-            }
-            const full = Math.min(present.length, config.ensemble ? config.brains : 1);
-            const share = Math.floor(config.percent / Math.max(1, full));
-            return present.map(({ name: who }, index) => (
-                `${who}: ${(index < full) ? `full brain, about ${share}% of the story budget` : "one line digest"}`
-            )).join("\n");
-        }
-        if ((name === "pin") || (name === "unpin") || (name === "forget")) {
-            const who = agentNamed(args[0]);
-            const key = formatKey(args.slice(1).join("_"));
-            if (!who || (key === "")) {
-                return `Usage: /${name} <character> <thought key>`;
-            }
-            const agent = new Agent(who, { percent: config.percent });
-            const brain = agent.brain;
-            const target = own(brain, key) ? key : (own(brain, `${CORE}${key}`) ? `${CORE}${key}` : null);
-            if (target === null) {
-                return `${who} has no thought called ${key}.`;
-            }
-            if (name === "forget") {
-                delete brain[target];
-                agent.card.description = serializeBrain(brain, config.json === true);
-                return `${who} has forgotten ${bareKey(target)}.`;
-            }
-            if (name === "pin") {
-                if (isCore(target)) {
-                    return `${bareKey(target)} is already pinned.`;
-                }
-                const pinned = Object.keys(brain).filter(isCore).length;
-                if (config.core <= pinned) {
-                    return `${who} already has ${pinned} pinned thoughts, which is the limit.`;
-                }
-                brain[`${CORE}${target}`] = brain[target];
-                delete brain[target];
-                agent.card.description = serializeBrain(brain, config.json === true);
-                return `${key} is pinned. ${who} will never forget it.`;
-            }
-            if (!isCore(target)) {
-                return `${key} was not pinned.`;
-            }
-            brain[bareKey(target)] = brain[target];
-            delete brain[target];
-            agent.card.description = serializeBrain(brain, config.json === true);
-            return `${key} is no longer pinned.`;
-        }
-        if (name === "undo") {
-            const undo = CH.undo;
-            if (!undo || (typeof undo.agent !== "string")) {
-                return "There is nothing to undo.";
-            }
-            const restored = [];
-            if (undo.agent !== "") {
-                const agent = new Agent(undo.agent, { percent: config.percent });
-                const card = agent.card;
-                if (!card || (typeof card !== "object")) {
-                    return "The brain card that change belongs to is gone.";
-                }
-                card.entry = undo.entry;
-                card.description = undo.description;
-                restored.push(`${undo.agent}'s mind`);
-            }
-            IS.label = Number.isInteger(undo.label) ? undo.label : IS.label;
-            IS.ops = Number.isInteger(undo.ops) ? undo.ops : IS.ops;
-            if (undo.world && (typeof undo.world === "object")) {
-                CH.world = undo.world;
-                writeWorld();
-                restored.push("the world");
-            }
-            if (undo.clocks && (typeof undo.clocks === "object")) {
-                CH.clocks = undo.clocks;
-                restored.push("the clocks");
-            }
-            if (undo.bonds && (typeof undo.bonds === "object")) {
-                CH.bonds = undo.bonds;
-                restored.push("every standing");
-            }
-            CH.undo = null;
-            journal("undo", { agent: undo.agent });
-            return `Reverted the last change to ${restored.join(", ")}.`;
-        }
-        if (name === "date") {
-            const value = args.join(" ").slice(0, 60);
-            if (value === "") {
-                return `The date is ${CH.world.date}.`;
-            }
-            CH.world.date = value;
-            writeWorld();
-            return `The date is now ${value}.`;
-        }
-        if (name === "audit") {
-            if (config.audit !== true) {
-                return "The continuity auditor is switched off in the config card.";
-            }
-            CH.audit.last = -config.auditEvery;
-            return "A continuity check will run on your next turn.";
-        }
-        if (name === "diag") {
-            const size = JSON.stringify(state).length;
-            const average = (window = []) => (
-                window.length ? `${Math.round(window.reduce((a, b) => (a + b), 0) / window.length)}ms` : "-"
-            );
-            const cost = CH.diag.cost || {};
-            return [
-                `Overruled by profile ${CH.budget.profile}: ${(() => {
-                    const caps = Object.entries(CH.diag.caps || {});
-                    return caps.length
-                        ? caps.map(([name, cap]) => `${name} ${cap.got} (you set ${cap.asked})`).join(", ")
-                        : "nothing, you are getting what you asked for";
-                })()}`,
-                `Context: ${CH.budget.maxChars || "unread"} chars, profile ${CH.budget.profile || "not scaling"}${(
-                    (0 < (CH.budget.changes || []).length)
-                    ? ` (last change ${CH.budget.changes[CH.budget.changes.length - 1].from} to ${CH.budget.changes[CH.budget.changes.length - 1].to} at turn ${CH.budget.changes[CH.budget.changes.length - 1].turn})`
-                    : ""
-                )}`,
-                `Model compliance: ${CH.compliance.band}, ${Math.round(complianceRate() * 100)}% of ${(CH.compliance.window || []).length} recent tasks${(
-                    ((CH.compliance.band === "minimal") && (getActionCount() < CH.compliance.cooldownUntil))
-                    ? `, asking again in ${CH.compliance.cooldownUntil - getActionCount()} turns`
-                    : ""
-                )}`,
-                `Injections landing: ${(config.canary === true) ? `${CH.canary.state} (${CH.canary.hits || 0} confirmed, ${CH.canary.misses || 0} missed in a row)` : "not checked"}`,
-                `Last turn cost: world ${cost.world || 0}, brains ${cost.brains || 0}, ensemble ${cost.ensemble || 0}, task ${cost.task || 0}, directive ${cost.directive || 0}, total ${cost.total || 0}${(
-                    cost.cap ? ` of ${cost.cap} allowed` : ""
-                )}`,
-                `State: ${size} of ${config.stateChars} chars (${Math.round((size / config.stateChars) * 100)}%)`,
-                `Hook time, recent average: input ${average(CH.diag.hooks.input)}, context ${average(CH.diag.hooks.context)}, output ${average(CH.diag.hooks.output)}`,
-                `Transactions: ${CH.stats.commits} committed, ${CH.stats.discards} discarded, ${CH.stats.refused} operations refused`,
-                `Skipped optional work: ${CH.diag.skips} times`,
-                `Card index: ${Object.keys(CH.index).length} cards, ${(() => {
-                    const hits = CH.diag.hits || 0;
-                    const total = hits + (CH.diag.misses || 0);
-                    return total ? `${Math.round((hits / total) * 100)}% hit rate` : "unused";
-                })()}`,
-                `Recent ledger: ${CH.journal.slice(-6).map(entry => `${entry.kind}@${entry.turn}`).join(", ") || "empty"}`
-            ].join("\n");
-        }
-        // Not one of ours, so it belongs to the story
-        return null;
-    };
-    /**
      * Writes the diagnostics card
+     *
+     * This card is where Chronicle answers for itself: the context it was handed, the
+     * profile that came from it, anything that profile overruled, whether the model is
+     * still answering, and what the last turn cost. It replaces the console that used to
+     * report the same things, because a command could only end a turn by stopping it
      * @param {Object} config - Validated config
      * @returns {void}
      */
@@ -4581,14 +3560,29 @@ You must output one short parenthetical task followed by the story continuation.
         if ((config.diag !== true) || !affordable(config, 30)) {
             return;
         }
-        const card = ownCard("Chronicle Diagnostics", "What Chronicle has been doing. Safe to delete; it will come back.", "");
+        const card = ownCard("Chronicle Diagnostics", "What Chronicle has been doing. Safe to delete; it will come back. This card is script only and never reaches the model.", "");
         if (!card) {
             return;
         }
         const size = JSON.stringify(state).length;
+        const average = (window = []) => (
+            window.length ? `${Math.round(window.reduce((a, b) => (a + b), 0) / window.length)}ms` : "-"
+        );
+        const cost = CH.diag.cost || {};
+        const caps = Object.entries(CH.diag.caps || {});
         card.description = [
+            // The context size is reported and left for the player to judge. Chronicle used
+            // to guess whether its injections were landing and could not tell a blocked
+            // channel from a model ignoring an instruction, so it no longer guesses
+            `context: ${CH.lastMaxChars || "unread"} chars, profile ${CH.budget.profile || "unread"}`,
+            `overruled by that profile: ${caps.length
+                ? caps.map(([name, cap]) => `${name} ${cap.got} (you set ${cap.asked})`).join(", ")
+                : "nothing"}`,
+            `model compliance: ${CH.compliance.band}, ${Math.round(complianceRate() * 100)}% of ${(CH.compliance.window || []).length} recent tasks`,
+            `last turn injected: world ${cost.world || 0}, brain ${cost.brains || 0}, task ${cost.task || 0}, directive ${cost.directive || 0}, total ${cost.total || 0}${cost.cap ? ` of ${cost.cap} allowed` : ""}`,
+            `hook time: input ${average(CH.diag.hooks.input)}, context ${average(CH.diag.hooks.context)}, output ${average(CH.diag.hooks.output)}`,
             `state: ${size} / ${config.stateChars} chars`,
-            `commits: ${CH.stats.commits}   discards: ${CH.stats.discards}   refused: ${CH.stats.refused}`,
+            `transactions: ${CH.stats.commits} committed, ${CH.stats.discards} discarded, ${CH.stats.refused} operations refused`,
             `skipped optional work: ${CH.diag.skips}`,
             "",
             "last transactions:",
@@ -4602,6 +3596,13 @@ You must output one short parenthetical task followed by the story continuation.
     // This is where (half) of the magic happens: Chronicle injects brains and tasks into context
     // Infer the current lifecycle hook
     if ((hook === "context") || Number.isInteger(info.maxChars)) {
+        if (CH.purged !== true) {
+            // The clocks card and the continuity log belonged to modules that are gone.
+            // Once, on the first turn after the upgrade, not on every turn after it
+            CH.purged = true;
+            dropCard("Chronicle Clocks");
+            dropCard("Chronicle Continuity Log");
+        }
         // Settle the ledger before anything reads a brain
         // This hook is the fallback commit site for continue turns that skip onInput,
         // and the discard site for a retry, whose context hook runs while onInput does not
@@ -4621,18 +3622,6 @@ You must output one short parenthetical task followed by the story continuation.
         IS.agent = "";
         /** @type {config} */
         const config = Config.get();
-        if (CH.console.stop === true) {
-            // Module H: the player typed a command, so there is nothing to generate
-            // This is the only place a hook can stop a turn, because the input shim has
-            // nowhere to return a stop flag to
-            CH.console.stop = false;
-            IS.agent = "";
-            IS.encoding = "";
-            globalThis.stop = true;
-            recordTiming("context");
-            text ||= " ";
-            return;
-        }
         if (config.world === true) {
             // Module C: the card is authoritative, so read it before anything is rendered
             readWorld(config.startDate);
@@ -4807,21 +3796,6 @@ You must output one short parenthetical task followed by the story continuation.
                 }
             }
         }
-        // Module D: who is actually in the scene, as opposed to merely named in it
-        const present = (config.ensemble === true) ? presentAgents(config) : [];
-        if (0 < present.length) {
-            // Writing stays one character per turn, rotated round-robin and weighted toward
-            // whoever spoke last. Concurrent writers would race for the same card
-            const weights = present.map((entry, index) => (present.length - index));
-            const total = weights.reduce((a, b) => (a + b), 0);
-            for (let [i, r] = [0, Math.random() * total]; i < present.length; i++) {
-                r -= weights[i];
-                if (r < 0) {
-                    IS.agent = present[i].name;
-                    break;
-                }
-            }
-        }
         // Temporary markers used to reliably identify sections of the context for later calculations
         const boundary = Object.freeze({
             // Hardcoded AID context header
@@ -4900,11 +3874,6 @@ You must output one short parenthetical task followed by the story continuation.
                 const value = brain[key];
                 // Clear from brain (keep instantaneous memory use low)
                 delete brain[key];
-                if ((config.bonds === true) && (key === BOND_STORE)) {
-                    // Module I states the standing as a fact of its own further down, and
-                    // saying it twice would only invite the model to argue with itself
-                    continue;
-                }
                 // Arrow separates label from thought content
                 const sliceIndex = value.indexOf("→");
                 const unknown = "*";
@@ -5008,18 +3977,8 @@ You must output one short parenthetical task followed by the story continuation.
          */
         const bindSelf = (joined = "") => ((mind.length = 0) || (joined === "")) ? "\n\n" : (
             (R.lean === true)
-            ? `\n\n${ownership(agent.name)} mind:\n${joined}${(
-                (config.bonds === true)
-                ? `\n- Standing with ${config.player}: ${BOND_STAGES[bondOf(agent.name).stage]}`
-                : ""
-            )}\n\n`
-            : `\n\n# ${ownership(agent.name)} brain and inner self: [\n${joined}${(
-                // Module I: where this character stands with the player, stated as a fact
-                // inside their own head rather than as an instruction from outside it
-                (config.bonds === true)
-                ? `\n- Standing with ${config.player}: ${BOND_STAGES[bondOf(agent.name).stage]}`
-                : ""
-            )}\n]\n\n`
+            ? `\n\n${ownership(agent.name)} mind:\n${joined}\n\n`
+            : `\n\n# ${ownership(agent.name)} brain and inner self: [\n${joined}\n]\n\n`
         );
         // Inner Self compared IS.hash against historyHash() here, and on a retry it fed the
         // model the brain with no task attached. That was the other half of the retry bug:
@@ -5036,7 +3995,6 @@ You must output one short parenthetical task followed by the story continuation.
              * question is not reaching it in the first place
              */
             const mayAsk = mayIssueTask(config);
-            const askingCanary = mayAsk && canaryDue(config);
             /**
              * Some turns have something more useful to do with the thought slot than form
              * another thought: prove the channel works, check the story for contradictions,
@@ -5046,15 +4004,6 @@ You must output one short parenthetical task followed by the story continuation.
             const specialTask = (() => {
                 if (!mayAsk) {
                     return null;
-                }
-                if (askingCanary) {
-                    // Module M, and nothing else this turn: the whole point is that it is
-                    // the simplest thing any model could answer
-                    return canaryPrompt();
-                }
-                if (auditDue(R) && affordable(config, 120)) {
-                    // Module G runs on the schedule, and reports without repairing
-                    return R.lean ? leanPrompt("audit", { agent: agent.name }) : auditPrompt(config.player);
                 }
                 if ((config.tiers !== true) || !affordable(config, 120)) {
                     return null;
@@ -5717,11 +4666,7 @@ Follow the format **perfectly**.
             ); } });
             // What the modules want said, above the brain block, and empty when they are
             // all switched off, which is what keeps a default install byte-identical
-            let overlay = buildOverlay(R, present, agent.name);
-            // Module D: the other people in the room, thinking their own thoughts
-            let ensemble = ensembleBlocks(R, present, agent.name, whitelist, Math.max(
-                800, (text.length - text.indexOf(boundary.upper)) + boundary.upper.length
-            ));
+            let overlay = buildOverlay(R, agent.name);
             // Module N: one imperative line and the grammar, instead of fifteen instructions
             // Neither of these spends a random draw, so both are safe to build up front
             const directive = (R.lean === true)
@@ -5769,7 +4714,7 @@ Follow the format **perfectly**.
             // off there is nothing here to give up, and the loop changes nothing
             const weigh = () => (
                 ((branch === "quiet") || (branch === "idle") ? 0 : directive.length)
-                + overlay.length + self.length + ensemble.length + task.length
+                + overlay.length + self.length + task.length
             );
             for (
                 let step = 0;
@@ -5777,16 +4722,12 @@ Follow the format **perfectly**.
                 step++
             ) {
                 degradeStep(R, step);
-                overlay = buildOverlay(R, present, agent.name);
-                ensemble = ensembleBlocks(R, present, agent.name, whitelist, Math.max(
-                    800, (text.length - text.indexOf(boundary.upper)) + boundary.upper.length
-                ));
+                overlay = buildOverlay(R, agent.name);
             }
             // Module J: what each part of this turn cost, for /diag
             CH.diag.cost = {
                 world: overlay.length,
                 brains: self.length,
-                ensemble: ensemble.length,
                 task: task.length,
                 directive: directive.length,
                 total: weigh(),
@@ -5796,7 +4737,7 @@ Follow the format **perfectly**.
             // Modules L and M: remember what was asked, so the answer can be judged
             CH.compliance.asked = ((branch === "quiet") || (branch === "idle")) ? null : {
                 turn: getActionCount(),
-                kind: askingCanary ? "canary" : branch
+                kind: branch
             };
             if ((branch === "quiet") || (branch === "idle")) {
                 IS.agent = " ";
@@ -5805,8 +4746,8 @@ Follow the format **perfectly**.
             text = ((branch === "quiet") || (branch === "idle"))
                 // Nothing is asked of the model, but the world and the existing brains
                 // still go in, read only
-                ? `${nondirective()}${overlay}${self}${ensemble}${text.trim()} `
-                : `${directive}${overlay}${self}${ensemble}${text.trim()}${boundary.lower}${task}\n\n`;
+                ? `${nondirective()}${overlay}${self}${text.trim()} `
+                : `${directive}${overlay}${self}${text.trim()}${boundary.lower}${task}\n\n`;
         }
         // ==================== CONTEXT TRUNCATION ====================
         // Three-phase truncation to fit within AID's context limit
@@ -5895,25 +4836,6 @@ Follow the format **perfectly**.
         // A new player action is the proof Chronicle waits for: the generation staged last
         // turn is now part of the story, so its operations are safe to write
         settlePending();
-        if (/^\s*\//.test(text)) {
-            // Module H: this might be a command rather than a story action
-            /** @type {config} */
-            const consoleConfig = Config.get();
-            if (consoleConfig.allow && (consoleConfig.console === true)) {
-                const reply = runCommand(text, consoleConfig);
-                if (typeof reply === "string") {
-                    // Answer the player, then stop the turn from the context hook, since
-                    // the input shim has nowhere to return a stop flag to
-                    state.message = reply;
-                    CH.console.stop = true;
-                    recordTiming("input");
-                    // Never an empty string, which the platform shows as an error
-                    text = "\u200B";
-                    return;
-                }
-            }
-            // Not one of ours, so it falls through to the story untouched
-        }
         // Check for /AC command to force-enable Auto-Cards
         if (IS.AC.enabled || !/\/\s*A\s*C/i.test(text) || !hasAutoCards()) {
             // Normal input processing
@@ -5942,15 +4864,11 @@ Follow the format **perfectly**.
     // Nothing already staged for this same turn is thrown away here: it may be a sibling
     // candidate from the same generation batch, and history will decide between them
     settlePending({ discardStale: false });
-    // Module M: was the canary answered? This is read before anything else touches the
-    // text, because every later step is entitled to rewrite it
+    // Module L: what, if anything, this turn asked the model for. Read before anything
+    // rewrites the text, and judged once the interpreter has had its say
     const asked = (CH.compliance.asked && (typeof CH.compliance.asked === "object"))
         ? CH.compliance.asked
         : null;
-    if (asked && (asked.kind === "canary")) {
-        recordCanary(/^[\s\u200B-\u200D]*\(\s*ok\s*\)/i.test(text));
-        CH.compliance.asked = null;
-    }
     // Process model output and implement brain operations
     /** @type {config} */
     const config = Config.get();
@@ -6294,16 +5212,6 @@ I hope you will have lots of fun!
                 found.push({ mod: "world", op: "advanceDays", n: days });
             }
         }
-        if (config.clocks === true) {
-            for (const id of triggeredClocks(readClocks(), prose).slice(0, 3)) {
-                found.push({ mod: "clock", op: "tick", id, n: 1 });
-            }
-            if (CH.fire && (CH.fire.turn === getActionCount()) && Array.isArray(CH.fire.ids)) {
-                // The directive went out in this turn's context, so the queue entry is spent
-                found.push({ mod: "queue", op: "fire", ids: CH.fire.ids });
-                CH.fire = null;
-            }
-        }
         if ((config.knows === true) && (0 < actors.length)) {
             found.push({
                 mod: "event", op: "record", actors, place: CH.world.place, tag: tagEvent(prose)
@@ -6495,16 +5403,6 @@ I hope you will have lots of fun!
         // Bonds, audits and memory merges are written by the model in the very same
         // parenthetical grammar as a thought, and are recognised here by their key. There
         // is one parser in this file, and this is not a second one
-        if ((config.bonds === true) && (key === BOND_KEY)) {
-            operations.push({
-                mod: "bond", op: "step", npc: agent.name, delta: readBondRequest(agent.name, value)
-            });
-            continue;
-        }
-        if ((config.audit === true) && (key === "audit")) {
-            operations.push({ mod: "audit", op: "record", value: value.slice(0, 300) });
-            continue;
-        }
         if ((config.tiers === true) && (key === "compress")) {
             const mem = memoryOf(agent.name);
             const summary = simplify(value.replaceAll("\u2192", " ")).trim().split("\n", 1)[0].trimEnd();
@@ -6664,7 +5562,7 @@ I hope you will have lots of fun!
     // ==================== MODULE L - JUDGING THE ANSWER ====================
     // A task was issued and this is what came back. Ops parsed cleanly count as compliance,
     // ops recovered from malformed output count as half, silence counts as nothing
-    if (asked && (asked.kind !== "canary")) {
+    if (asked) {
         recordCompliance(
             (operations.length === 0) ? 0 : (repaired ? 0.5 : 1)
         );
@@ -6679,9 +5577,6 @@ I hope you will have lots of fun!
     // generation these operations came from has actually landed in the story
     if (operations.length === 0) {
         // No operations to stage, we're done
-        if (config.canary === true) {
-            writeFallbackChannel(config);
-        }
         recordTiming("output");
         return;
     }
@@ -6719,11 +5614,6 @@ I hope you will have lots of fun!
     }
     text ||= "\u200B";
     parkTransaction(staged, agent, labelStart, config, actors);
-    if (config.canary === true) {
-        // Module M: memory written here takes effect from the next action, which is
-        // exactly when the fallback is needed
-        writeFallbackChannel(config);
-    }
     // State is at its largest right here, with a transaction staged and not yet spent
     enforceStateBudget(commitConfig({ cfg: moduleConfig(config) }));
     recordTiming("output");
